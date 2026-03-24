@@ -4,46 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KI Mail Assistent</title>
-<script>
-function login() {
-  var pw = document.getElementById('pw').value;
-  if (pw === 'EHC2026') {
-    sessionStorage.setItem('auth','1');
-    document.getElementById('loginpage').style.display = 'none';
-    document.getElementById('mainpage').style.display = 'block';
-    init();
-  } else {
-    document.getElementById('err').style.display = 'block';
-    document.getElementById('pw').value = '';
-  }
-}
-function logout() {
-  sessionStorage.removeItem('auth');
-  location.reload();
-}
-</script>
 <style>
-body{margin:0;padding:0;font-family:sans-serif;background:#111;color:#eee;height:100vh}
-#loginpage{display:flex;align-items:center;justify-content:center;height:100vh;background:#111}
+body{margin:0;font-family:sans-serif;background:#111;color:#eee;height:100vh}
+#loginpage{display:flex;align-items:center;justify-content:center;height:100vh}
 .box{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:40px;width:300px;text-align:center}
-.box h2{margin:0 0 8px;font-size:18px}
-.box p{margin:0 0 20px;font-size:12px;color:#666}
+.box h2{margin:0 0 8px;font-size:18px}.box p{margin:0 0 20px;font-size:12px;color:#666}
 .box input{width:100%;padding:10px;background:#222;color:#eee;border:1px solid #333;border-radius:6px;font-size:14px;margin-bottom:12px;box-sizing:border-box}
 .box button{width:100%;padding:10px;background:#d4b896;color:#111;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold}
-.box .err{color:#f87171;font-size:12px;margin-top:8px;display:none}
-#mainpage{display:none;height:100vh}
+#err{color:#f87171;font-size:12px;margin-top:8px;display:none}
+#mainpage{display:none;height:100vh;flex-direction:column}
 .topbar{height:44px;display:flex;align-items:center;padding:0 16px;background:#171717;border-bottom:1px solid #2a2a2a;gap:10px}
-.logo{font-size:11px;letter-spacing:0.1em;color:#d4b896;font-family:monospace}
-.spacer{flex:1}
+.logo{font-size:11px;letter-spacing:0.1em;color:#d4b896;font-family:monospace}.spacer{flex:1}
 .tbtn{font-size:11px;padding:4px 10px;background:#222;color:#888;border:1px solid #333;border-radius:4px;cursor:pointer}
 .tbtn:hover{color:#eee}
 .layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 44px)}
 .sidebar{background:#171717;border-right:1px solid #2a2a2a;overflow-y:auto}
-.sh{padding:10px 14px;border-bottom:1px solid #2a2a2a;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;display:flex;justify-content:space-between}
+.sh{padding:10px 14px;border-bottom:1px solid #2a2a2a;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;display:flex;justify-content:space-between;font-family:monospace}
 .mr{padding:10px 14px;border-bottom:1px solid #2a2a2a;cursor:pointer}
-.mr:hover{background:#1f1f1f}
-.mr.active{background:#272727;border-left:2px solid #d4b896}
-.mr.done{opacity:0.4}
+.mr:hover{background:#1f1f1f}.mr.active{background:#272727;border-left:2px solid #d4b896}.mr.done{opacity:0.4}
 .mt{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .prio{font-size:9px;padding:2px 6px;border-radius:2px;font-weight:bold;white-space:nowrap;font-family:monospace}
 .pu{background:rgba(248,113,133,0.15);color:#f87171;border:1px solid rgba(248,113,133,0.3)}
@@ -70,17 +48,14 @@ select{width:100%;background:#1f1f1f;color:#eee;border:1px solid #2a2a2a;border-
 .fname{font-size:10px;color:#666;padding:7px 10px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:4px;margin-top:5px;word-break:break-all;font-family:monospace}
 .fnx{color:#d4b896}
 .fbbox{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px}
-.stars{display:flex;gap:4px;align-items:center}
-.star{font-size:18px;cursor:pointer;color:#333;line-height:1}
-.star.on{color:#fbbf24}
+.stars{display:flex;gap:6px;align-items:center;font-size:20px}
+.star{cursor:pointer;color:#333}.star.on{color:#fbbf24}
 .slbl{font-size:10px;color:#666;margin-left:6px;font-family:monospace}
 .dfoot{padding:10px 18px;background:#171717;border-top:1px solid #2a2a2a;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .btn{font-size:11px;padding:7px 14px;border-radius:5px;cursor:pointer;font-weight:500;border:none;font-family:monospace}
-.bconf{background:#5eead4;color:#111}
-.bconf:hover{opacity:0.85}
+.bconf{background:#5eead4;color:#111}.bconf:hover{opacity:0.85}
 .bol{background:rgba(125,211,252,0.1);color:#7dd3fc;border:1px solid rgba(125,211,252,0.25)}
-.bsave{background:transparent;color:#666;border:1px solid #2a2a2a}
-.bsave:hover{color:#eee}
+.bsave{background:transparent;color:#666;border:1px solid #2a2a2a}.bsave:hover{color:#eee}
 .bskip{background:transparent;color:#f87171;border:1px solid rgba(248,113,133,0.2);margin-left:auto}
 .sok{font-size:10px;color:#5eead4;display:none;font-family:monospace}
 .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#333;gap:8px}
@@ -89,23 +64,21 @@ select{width:100%;background:#1f1f1f;color:#eee;border:1px solid #2a2a2a;border-
 </style>
 </head>
 <body>
-
 <div id="loginpage">
   <div class="box">
     <h2>KI Mail Assistent</h2>
     <p>EHC &bull; Nur fuer autorisierte Nutzer</p>
     <input type="password" id="pw" placeholder="Passwort" onkeydown="if(event.key==='Enter')login()">
     <button onclick="login()">Einloggen</button>
-    <div class="err" id="err">Falsches Passwort</div>
+    <div id="err">Falsches Passwort</div>
   </div>
 </div>
-
 <div id="mainpage">
   <div class="topbar">
     <span class="logo">EHC &bull; KI MAIL ASSISTENT</span>
     <div class="spacer"></div>
     <span id="badge" style="font-size:10px;color:#fbbf24;font-family:monospace">-</span>
-    <button class="tbtn" onclick="refreshMails()">&#8635; Aktualisieren</button>
+    <button class="tbtn" onclick="refreshMails()">Aktualisieren</button>
     <button class="tbtn" onclick="logout()" style="color:#f87171">Abmelden</button>
   </div>
   <div class="layout">
@@ -114,95 +87,11 @@ select{width:100%;background:#1f1f1f;color:#eee;border:1px solid #2a2a2a;border-
       <div id="slist"></div>
     </div>
     <div class="detail" id="det">
-      <div class="empty"><span style="font-size:32px;opacity:0.15">&#x2709;</span><span style="font-size:12px">Mail auswaehlen</span></div>
+      <div class="empty"><span style="font-size:32px;opacity:0.15">@</span><span style="font-size:12px">Mail auswaehlen</span></div>
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
-
-<script>
-var F=['EHC / Eingangsrechnungen','EHC / Vertraege','EHC / Korrespondenz','EHC / Personal','EHC / Finanzen','EHC / OP-Dokumentation','Qodia / Allgemein','Qodia / Investoren','Qodia / Vertraege','Privat / Allgemein','Kein Anhang'];
-var M=[
-  {id:1,from:'rechnungen@helios-kliniken.de',org:'Helios_Kliniken',subj:'Rechnung Maerz 2026 - Kooperation',t:'09:14',prio:'pu',pl:'Wichtig & Dringend',ak:'Rechnung pruefen und bezahlen',bg:'Eingangsrechnung Helios. Zahlungsfrist 14 Tage.',wt:'Betrag pruefen. Zahlung veranlassen.',at:'Sehr geehrte Damen und Herren,
-
-vielen Dank fuer die Rechnung. Ich veranlasse die Zahlung zeitnah.
-
-Mit freundlichen Gruessen
-Ole Reinpold',or:'EHC / Eingangsrechnungen',ah:'Rechnung_EHC_Maerz2026.pdf',r:0,fb:'',d:false},
-  {id:2,from:'k.mueller@praxis-mueller.de',org:'Praxis_Mueller',subj:'Patientenueberweisung Hernie',t:'10:32',prio:'pi',pl:'Wichtig',ak:'Terminvorschlaege senden',bg:'Kollegin wartet auf Bestaetigung.',wt:'Termin anlegen nach Bestaetigung.',at:'Sehr geehrte Frau Dr. Mueller,
-
-Terminvorschlaege:
-- Di 08.04. 10:00 Uhr
-- Do 10.04. 14:00 Uhr
-
-Mit freundlichen Gruessen
-Ole Reinpold',or:'EHC / Korrespondenz',ah:null,r:0,fb:'',d:false},
-  {id:3,from:'info@steuerberater-franke.de',org:'Steuerberater_Franke',subj:'Unterlagen Jahresabschluss 2025',t:'Gestern',prio:'pm',pl:'Muss gemacht werden',ak:'Unterlagen zusammenstellen',bg:'Zweite Erinnerung. Frist naehert sich.',wt:'Kontoauszuege und Belege 2025.',at:'Sehr geehrter Herr Franke,
-
-Unterlagen folgen bis Ende der Woche.
-
-Mit freundlichen Gruessen
-Ole Reinpold',or:'EHC / Finanzen',ah:null,r:0,fb:'',d:false},
-  {id:4,from:'news@medtech-messe.de',org:'MedTech_Messe',subj:'MedTech Summit Hamburg 2026',t:'Gestern',prio:'pn',pl:'Nice to have',ak:'Kenntnisnahme',bg:'Newsletter.',wt:'Datum vormerken.',at:'',or:'Kein Anhang',ah:null,r:0,fb:'',d:false},
-  {id:5,from:'lasse@qodia.de',org:'Qodia',subj:'Update Investorengespraech',t:'Mo',prio:'pf',pl:'Nachhalten',ak:'Bestaetigung abwarten',bg:'Update Mitgruender Lasse.',wt:'Kalender pruefen.',at:'Hi Lasse, danke, passt. Ole',or:'Qodia / Investoren',ah:null,r:0,fb:'',d:false}
-];
-var sel=null;
-function ds(){var d=new Date();return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
-function fn(m){if(!m.ah)return null;var p=m.ah.split('.');var e=p.pop();return ds()+'_'+m.org+'_'+p.join('.')+'.'+e;}
-function toast(s){var t=document.getElementById('toast');t.textContent=s;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2200);}
-function rs(){
-  var p=M.filter(function(m){return !m.d;}).length;
-  document.getElementById('badge').textContent=p+' ausstehend';
-  document.getElementById('sc').textContent=M.length;
-  document.getElementById('slist').innerHTML=M.map(function(m){
-    return '<div class="mr'+(m.d?' done':'')+(sel&&sel.id===m.id?' active':'')+'" onclick="pick('+m.id+')">'
-      +'<div class="mt"><span class="prio '+m.prio+'">'+m.pl+'</span><span class="mtime">'+m.t+'</span></div>'
-      +'<div class="msubj">'+m.subj+'</div><div class="mfrom">'+m.from+'</div></div>';
-  }).join('');
-}
-function rd(){
-  var det=document.getElementById('det');
-  if(!sel){det.innerHTML='<div class="empty"><span style="font-size:32px;opacity:0.15">&#x2709;</span><span style="font-size:12px">Mail auswaehlen</span></div>';return;}
-  var m=sel,f=fn(m);
-  var SL=['','Falsch','Eher falsch','Teilweise','Gut','Perfekt'];
-  var h='<div class="dhead"><div class="dinfo"><div class="dsubj">'+m.subj+'</div><div class="dfrom">'+m.from+' &middot; '+m.t+'</div></div><span class="prio '+m.prio+'">'+m.pl+'</span></div>';
-  h+='<div class="dbody">';
-  h+='<div class="g3">'
-    +'<div><div class="lbl">Aktion</div><div class="card">'+m.ak+'</div></div>'
-    +'<div><div class="lbl">Begruendung</div><div class="card">'+m.bg+'</div></div>'
-    +'<div><div class="lbl">Weitere Aktionen</div><div class="card" style="color:#888">'+m.wt+'</div></div>'
-    +'</div>';
-  h+='<div><div class="lbl">Antwortvorschlag</div><textarea id="ta'+m.id+'" rows="9">'+m.at+'</textarea></div>';
-  h+='<div class="g2"><div>'
-    +'<div class="lbl">OneDrive Ordner</div>'
-    +'<select id="fs'+m.id+'">'+F.map(function(x){return '<option'+(x===m.or?' selected':'')+'>'+x+'</option>';}).join('')+'</select>'
-    +(f?'<div class="fname"><span class="fnx">'+ds()+'_'+m.org+'_</span>'+m.ah.split('.').slice(0,-1).join('.')+'.'+m.ah.split('.').pop()+'</div>':'<div style="font-size:10px;color:#444;margin-top:5px">Kein Anhang</div>')
-    +'</div>';
-  h+='<div class="fbbox"><div class="lbl">Feedback KI-Training</div>'
-    +'<div class="stars">'
-    +[1,2,3,4,5].map(function(i){return '<span class="star'+(i<=m.r?' on':'')+'" onclick="rate('+m.id+','+i+')" onmouseenter="hs('+m.id+','+i+')" onmouseleave="hs('+m.id+',0)">&#9733;</span>';}).join('')
-    +'<span class="slbl" id="slbl'+m.id+'">'+(m.r?SL[m.r]:'')+'</span></div>'
-    +'<textarea rows="3" placeholder="Was war falsch?" style="font-size:11px" id="fb'+m.id+'">'+m.fb+'</textarea>'
-    +'</div></div></div>';
-  h+='<div class="dfoot">'
-    +'<button class="btn bconf" onclick="conf('+m.id+')">&#10003; Bestaetigen</button>'
-    +'<button class="btn bol" onclick="ol('+m.id+')">&#x2709; In Outlook</button>'
-    +'<button class="btn bsave" onclick="save('+m.id+')">Entwurf</button>'
-    +'<span class="sok" id="ok'+m.id+'">&#10003; gespeichert</span>'
-    +'<button class="btn bskip" onclick="skip('+m.id+')">&#8594; Ueberspringen</button>'
-    +'</div>';
-  det.innerHTML=h;
-}
-function pick(id){sel=M.find(function(m){return m.id===id;});rs();rd();}
-function hs(id,n){var m=M.find(function(x){return x.id===id;});var L=['','Falsch','Eher falsch','Teilweise','Gut','Perfekt'];document.querySelectorAll('[onclick^="rate('+id+'"]').forEach(function(s,i){s.className='star'+(i+1<=(n||m.r)?' on':'');});var l=document.getElementById('slbl'+id);if(l)l.textContent=n?L[n]:(m.r?L[m.r]:'');}
-function rate(id,r){M.find(function(x){return x.id===id;}).r=r;hs(id,0);}
-function save(id){var m=M.find(function(x){return x.id===id;});var ta=document.getElementById('ta'+id),fb=document.getElementById('fb'+id),fs=document.getElementById('fs'+id);if(ta)m.at=ta.value;if(fb)m.fb=fb.value;if(fs)m.or=fs.value;var ok=document.getElementById('ok'+id);if(ok){ok.style.display='block';setTimeout(function(){ok.style.display='none';},2000);}}
-function conf(id){save(id);M.find(function(x){return x.id===id;}).d=true;toast('Abgelegt');sel=M.find(function(x){return !x.d;})||null;rs();rd();}
-function skip(id){var i=M.findIndex(function(x){return x.id===id;});sel=M.find(function(x,j){return j>i&&!x.d;})||M.find(function(x,j){return j<i&&!x.d;})||null;rs();rd();}
-function ol(id){var m=M.find(function(x){return x.id===id;});var ta=document.getElementById('ta'+id);window.open('mailto:'+m.from+'?subject='+encodeURIComponent('AW: '+m.subj)+'&body='+encodeURIComponent(ta?ta.value:m.at),'_self');}
-function refreshMails(){toast('Demo - SharePoint noch nicht verbunden');}
-function init(){rs();pick(1);}
-</script>
+<script src="app.js"></script>
 </body>
 </html>
