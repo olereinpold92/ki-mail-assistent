@@ -2,150 +2,135 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KI Mail Assistent - EHC</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KI Mail Assistent</title>
+<script>
+function login() {
+  var pw = document.getElementById('pw').value;
+  if (pw === 'EHC2026') {
+    sessionStorage.setItem('auth','1');
+    document.getElementById('loginpage').style.display = 'none';
+    document.getElementById('mainpage').style.display = 'block';
+    init();
+  } else {
+    document.getElementById('err').style.display = 'block';
+    document.getElementById('pw').value = '';
+  }
+}
+function logout() {
+  sessionStorage.removeItem('auth');
+  location.reload();
+}
+</script>
 <style>
-:root{--bg:#0e0e0e;--s1:#171717;--s2:#1f1f1f;--s3:#272727;--b1:#2a2a2a;--b2:#383838;--b3:#484848;--text:#ede9e3;--muted:#777;--dim:#444;--accent:#d4b896;--green:#5eead4;--red:#fb7185;--yellow:#fbbf24;--blue:#7dd3fc}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
-#ls{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999}
-.lb{background:var(--s1);border:1px solid var(--b2);border-radius:10px;padding:40px 48px;width:340px;display:flex;flex-direction:column;gap:18px;text-align:center}
-.ll{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.15em;color:var(--accent)}
-.lt{font-size:18px;font-weight:600}
-.lsub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
-.li{width:100%;background:var(--s2);color:var(--text);border:1px solid var(--b1);border-radius:6px;padding:10px 14px;font-size:13px;font-family:'Syne',sans-serif;text-align:left}
-.li:focus{outline:none;border-color:var(--b3)}
-.lbtn{width:100%;padding:10px;background:var(--accent);color:#0e0e0e;border:none;border-radius:6px;font-size:13px;font-family:'DM Mono',monospace;font-weight:500;cursor:pointer}
-.lbtn:hover{opacity:0.88}
-.lerr{font-size:11px;color:var(--red);font-family:'DM Mono',monospace;display:none}
-#app{display:none;height:100%;flex-direction:column}
-.topbar{height:44px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--b1);background:var(--s1);flex-shrink:0}
-.logo{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.12em;color:var(--accent)}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2.5s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
-.tsp{flex:1}
-.pb{font-family:'DM Mono',monospace;font-size:10px;padding:3px 9px;border-radius:3px;background:rgba(251,191,36,0.1);color:var(--yellow);border:1px solid rgba(251,191,36,0.2)}
-.tb{font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border-radius:4px;background:var(--s3);color:var(--muted);border:1px solid var(--b1);cursor:pointer}
-.tb:hover{color:var(--text)}
-.layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 44px);overflow:hidden}
-.sidebar{border-right:1px solid var(--b1);background:var(--s1);display:flex;flex-direction:column;overflow:hidden}
-.sh{padding:10px 14px;border-bottom:1px solid var(--b1);font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;display:flex;align-items:center;justify-content:space-between}
-.slist{overflow-y:auto;flex:1}
-.slist::-webkit-scrollbar{width:3px}
-.slist::-webkit-scrollbar-thumb{background:var(--b2)}
-.mr{padding:10px 14px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background 0.1s}
-.mr:hover{background:var(--s2)}
-.mr.active{background:var(--s3);border-left:2px solid var(--accent)}
-.mr.done{opacity:0.38}
+body{margin:0;padding:0;font-family:sans-serif;background:#111;color:#eee;height:100vh}
+#loginpage{display:flex;align-items:center;justify-content:center;height:100vh;background:#111}
+.box{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:40px;width:300px;text-align:center}
+.box h2{margin:0 0 8px;font-size:18px}
+.box p{margin:0 0 20px;font-size:12px;color:#666}
+.box input{width:100%;padding:10px;background:#222;color:#eee;border:1px solid #333;border-radius:6px;font-size:14px;margin-bottom:12px;box-sizing:border-box}
+.box button{width:100%;padding:10px;background:#d4b896;color:#111;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold}
+.box .err{color:#f87171;font-size:12px;margin-top:8px;display:none}
+#mainpage{display:none;height:100vh}
+.topbar{height:44px;display:flex;align-items:center;padding:0 16px;background:#171717;border-bottom:1px solid #2a2a2a;gap:10px}
+.logo{font-size:11px;letter-spacing:0.1em;color:#d4b896;font-family:monospace}
+.spacer{flex:1}
+.tbtn{font-size:11px;padding:4px 10px;background:#222;color:#888;border:1px solid #333;border-radius:4px;cursor:pointer}
+.tbtn:hover{color:#eee}
+.layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 44px)}
+.sidebar{background:#171717;border-right:1px solid #2a2a2a;overflow-y:auto}
+.sh{padding:10px 14px;border-bottom:1px solid #2a2a2a;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;display:flex;justify-content:space-between}
+.mr{padding:10px 14px;border-bottom:1px solid #2a2a2a;cursor:pointer}
+.mr:hover{background:#1f1f1f}
+.mr.active{background:#272727;border-left:2px solid #d4b896}
+.mr.done{opacity:0.4}
 .mt{display:flex;align-items:center;gap:6px;margin-bottom:4px}
-.prio{font-family:'DM Mono',monospace;font-size:9px;padding:2px 6px;border-radius:2px;font-weight:500;white-space:nowrap;flex-shrink:0}
-.p-u{background:rgba(251,113,133,0.12);color:var(--red);border:1px solid rgba(251,113,133,0.25)}
-.p-i{background:rgba(251,191,36,0.1);color:var(--yellow);border:1px solid rgba(251,191,36,0.2)}
-.p-m{background:rgba(125,211,252,0.1);color:var(--blue);border:1px solid rgba(125,211,252,0.2)}
-.p-n{background:rgba(119,119,119,0.1);color:var(--muted);border:1px solid rgba(119,119,119,0.15)}
-.p-f{background:rgba(212,184,150,0.1);color:var(--accent);border:1px solid rgba(212,184,150,0.2)}
-.mti{font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);margin-left:auto}
-.msub{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.mfr{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.detail{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
-.dh{padding:12px 20px;border-bottom:1px solid var(--b1);background:var(--s1);display:flex;align-items:center;gap:12px;flex-shrink:0}
-.di{flex:1;min-width:0}
-.dsubj{font-size:15px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dfrom{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
-.dbody{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
-.dbody::-webkit-scrollbar{width:3px}
-.dbody::-webkit-scrollbar-thumb{background:var(--b2)}
-.lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
-.card{background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:10px 13px}
-.cv{font-size:12px;color:var(--text);line-height:1.5}
-.cvm{color:var(--muted)}
+.prio{font-size:9px;padding:2px 6px;border-radius:2px;font-weight:bold;white-space:nowrap;font-family:monospace}
+.pu{background:rgba(248,113,133,0.15);color:#f87171;border:1px solid rgba(248,113,133,0.3)}
+.pi{background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.25)}
+.pm{background:rgba(125,211,252,0.1);color:#7dd3fc;border:1px solid rgba(125,211,252,0.25)}
+.pn{background:rgba(120,120,120,0.1);color:#888;border:1px solid rgba(120,120,120,0.2)}
+.pf{background:rgba(212,184,150,0.1);color:#d4b896;border:1px solid rgba(212,184,150,0.25)}
+.mtime{font-size:9px;color:#444;margin-left:auto;font-family:monospace}
+.msubj{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.mfrom{font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:monospace}
+.detail{display:flex;flex-direction:column;overflow:hidden}
+.dhead{padding:12px 18px;background:#171717;border-bottom:1px solid #2a2a2a;display:flex;align-items:center;gap:10px}
+.dinfo{flex:1;min-width:0}
+.dsubj{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.dfrom{font-size:11px;color:#666;font-family:monospace}
+.dbody{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.lbl{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.1em;font-family:monospace;margin-bottom:4px}
+.card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:10px 12px;font-size:12px;color:#ccc;line-height:1.5}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
-textarea{width:100%;background:var(--s2);color:var(--text);border:1px solid var(--b1);border-radius:6px;padding:11px 13px;font-size:12px;font-family:'Syne',sans-serif;resize:vertical;line-height:1.65}
-textarea:focus{outline:none;border-color:var(--b3)}
-select{width:100%;background:var(--s2);color:var(--text);border:1px solid var(--b1);border-radius:6px;padding:8px 11px;font-size:12px;font-family:'Syne',sans-serif;cursor:pointer}
-.fnp{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding:7px 11px;background:var(--s2);border:1px solid var(--b1);border-radius:5px;margin-top:6px;word-break:break-all}
-.fnx{color:var(--accent);font-weight:500}
-.fbw{background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+textarea{width:100%;background:#1f1f1f;color:#eee;border:1px solid #2a2a2a;border-radius:6px;padding:10px 12px;font-size:12px;font-family:sans-serif;resize:vertical;line-height:1.65;box-sizing:border-box}
+textarea:focus{outline:none;border-color:#444}
+select{width:100%;background:#1f1f1f;color:#eee;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px;font-size:12px}
+.fname{font-size:10px;color:#666;padding:7px 10px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:4px;margin-top:5px;word-break:break-all;font-family:monospace}
+.fnx{color:#d4b896}
+.fbbox{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .stars{display:flex;gap:4px;align-items:center}
-.star{font-size:17px;cursor:pointer;color:var(--b3);line-height:1}
-.star.on{color:var(--yellow)}
-.slbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-left:6px}
-.dft{padding:10px 20px;border-top:1px solid var(--b1);background:var(--s1);display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap}
-.btn{font-family:'DM Mono',monospace;font-size:11px;padding:7px 16px;border-radius:5px;cursor:pointer;font-weight:500;white-space:nowrap;border:none}
-.bc{background:var(--green);color:#0e0e0e}
-.bo{background:rgba(125,211,252,0.1);color:var(--blue);border:1px solid rgba(125,211,252,0.25)}
-.bs{background:transparent;color:var(--muted);border:1px solid var(--b1)}
-.bsk{background:transparent;color:var(--red);border:1px solid rgba(251,113,133,0.2);margin-left:auto}
-.sok{font-family:'DM Mono',monospace;font-size:10px;color:var(--green);display:none}
-.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
-.ei{font-size:36px;opacity:0.2}
-.et{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
-.toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;background:var(--s3);border:1px solid var(--b2);border-radius:6px;font-family:'DM Mono',monospace;font-size:11px;color:var(--green);opacity:0;transform:translateY(10px);transition:all 0.25s;pointer-events:none;z-index:100}
+.star{font-size:18px;cursor:pointer;color:#333;line-height:1}
+.star.on{color:#fbbf24}
+.slbl{font-size:10px;color:#666;margin-left:6px;font-family:monospace}
+.dfoot{padding:10px 18px;background:#171717;border-top:1px solid #2a2a2a;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{font-size:11px;padding:7px 14px;border-radius:5px;cursor:pointer;font-weight:500;border:none;font-family:monospace}
+.bconf{background:#5eead4;color:#111}
+.bconf:hover{opacity:0.85}
+.bol{background:rgba(125,211,252,0.1);color:#7dd3fc;border:1px solid rgba(125,211,252,0.25)}
+.bsave{background:transparent;color:#666;border:1px solid #2a2a2a}
+.bsave:hover{color:#eee}
+.bskip{background:transparent;color:#f87171;border:1px solid rgba(248,113,133,0.2);margin-left:auto}
+.sok{font-size:10px;color:#5eead4;display:none;font-family:monospace}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#333;gap:8px}
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;background:#272727;border:1px solid #383838;border-radius:6px;font-size:11px;color:#5eead4;opacity:0;transform:translateY(10px);transition:all 0.25s;pointer-events:none;z-index:100;font-family:monospace}
 .toast.show{opacity:1;transform:translateY(0)}
 </style>
 </head>
 <body>
-<div id="ls">
-  <div class="lb">
-    <div class="ll">EHC &middot; KI MAIL ASSISTENT</div>
-    <div class="lt">Anmelden</div>
-    <div class="lsub">Nur f&uuml;r autorisierte Nutzer</div>
-    <input class="li" type="password" id="pw" placeholder="Passwort" onkeydown="if(event.key==='Enter')login()">
-    <button class="lbtn" onclick="login()">Einloggen</button>
-    <div class="lerr" id="lerr">Falsches Passwort</div>
+
+<div id="loginpage">
+  <div class="box">
+    <h2>KI Mail Assistent</h2>
+    <p>EHC &bull; Nur fuer autorisierte Nutzer</p>
+    <input type="password" id="pw" placeholder="Passwort" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">Einloggen</button>
+    <div class="err" id="err">Falsches Passwort</div>
   </div>
 </div>
-<div id="app" style="display:none;height:100%;flex-direction:column">
+
+<div id="mainpage">
   <div class="topbar">
-    <span class="logo">EHC &middot; KI MAIL ASSISTENT</span>
-    <div class="dot"></div>
-    <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">o.reinpold@hernie.de</span>
-    <div class="tsp"></div>
-    <span class="pb" id="badge">-</span>
-    <button class="tb" onclick="refreshMails()">&#8635; Aktualisieren</button>
-    <button class="tb" onclick="logout()" style="color:var(--red)">Abmelden</button>
+    <span class="logo">EHC &bull; KI MAIL ASSISTENT</span>
+    <div class="spacer"></div>
+    <span id="badge" style="font-size:10px;color:#fbbf24;font-family:monospace">-</span>
+    <button class="tbtn" onclick="refreshMails()">&#8635; Aktualisieren</button>
+    <button class="tbtn" onclick="logout()" style="color:#f87171">Abmelden</button>
   </div>
   <div class="layout">
     <div class="sidebar">
-      <div class="sh"><span>Posteingang</span><span id="sc" style="color:var(--dim)">-</span></div>
-      <div class="slist" id="slist"></div>
+      <div class="sh"><span>Posteingang</span><span id="sc">-</span></div>
+      <div id="slist"></div>
     </div>
     <div class="detail" id="det">
-      <div class="empty"><div class="ei">&#x2709;</div><div class="et">Mail ausw&auml;hlen</div></div>
+      <div class="empty"><span style="font-size:32px;opacity:0.15">&#x2709;</span><span style="font-size:12px">Mail auswaehlen</span></div>
     </div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
-var PW='EHC2026!';
-function login(){
-  if(document.getElementById('pw').value===PW){
-    sessionStorage.setItem('ki','1');
-    show();
-  }else{
-    document.getElementById('lerr').style.display='block';
-    document.getElementById('pw').value='';
-    document.getElementById('pw').focus();
-  }
-}
-function logout(){sessionStorage.removeItem('ki');location.reload();}
-function show(){
-  document.getElementById('ls').style.display='none';
-  document.getElementById('app').style.display='flex';
-  renderSidebar();pick(1);
-}
-if(sessionStorage.getItem('ki')==='1')show();
 var F=['EHC / Eingangsrechnungen','EHC / Vertraege','EHC / Korrespondenz','EHC / Personal','EHC / Finanzen','EHC / OP-Dokumentation','Qodia / Allgemein','Qodia / Investoren','Qodia / Vertraege','Privat / Allgemein','Kein Anhang'];
 var M=[
-{id:1,from:'rechnungen@helios-kliniken.de',org:'Helios_Kliniken',subject:'Rechnung Maerz 2026',time:'09:14',prio:'p-u',pl:'Wichtig & Dringend',ak:'Rechnung pruefen und bezahlen',bg:'Eingangsrechnung Helios. Zahlungsfrist 14 Tage.',wt:'Betrag pruefen. Zahlung veranlassen.',at:'Sehr geehrte Damen und Herren,
+  {id:1,from:'rechnungen@helios-kliniken.de',org:'Helios_Kliniken',subj:'Rechnung Maerz 2026 - Kooperation',t:'09:14',prio:'pu',pl:'Wichtig & Dringend',ak:'Rechnung pruefen und bezahlen',bg:'Eingangsrechnung Helios. Zahlungsfrist 14 Tage.',wt:'Betrag pruefen. Zahlung veranlassen.',at:'Sehr geehrte Damen und Herren,
 
 vielen Dank fuer die Rechnung. Ich veranlasse die Zahlung zeitnah.
 
 Mit freundlichen Gruessen
 Ole Reinpold',or:'EHC / Eingangsrechnungen',ah:'Rechnung_EHC_Maerz2026.pdf',r:0,fb:'',d:false},
-{id:2,from:'k.mueller@praxis-mueller.de',org:'Praxis_Mueller',subject:'Patientenueberweisung Hernie',time:'10:32',prio:'p-i',pl:'Wichtig',ak:'Terminvorschlaege senden',bg:'Kollegin wartet auf Bestaetigung.',wt:'Termin anlegen nach Bestaetigung.',at:'Sehr geehrte Frau Dr. Mueller,
+  {id:2,from:'k.mueller@praxis-mueller.de',org:'Praxis_Mueller',subj:'Patientenueberweisung Hernie',t:'10:32',prio:'pi',pl:'Wichtig',ak:'Terminvorschlaege senden',bg:'Kollegin wartet auf Bestaetigung.',wt:'Termin anlegen nach Bestaetigung.',at:'Sehr geehrte Frau Dr. Mueller,
 
 Terminvorschlaege:
 - Di 08.04. 10:00 Uhr
@@ -153,53 +138,71 @@ Terminvorschlaege:
 
 Mit freundlichen Gruessen
 Ole Reinpold',or:'EHC / Korrespondenz',ah:null,r:0,fb:'',d:false},
-{id:3,from:'info@steuerberater-franke.de',org:'Steuerberater_Franke',subject:'Unterlagen Jahresabschluss 2025',time:'Gestern',prio:'p-m',pl:'Muss gemacht werden',ak:'Unterlagen zusammenstellen',bg:'Zweite Erinnerung. Frist naehert sich.',wt:'Kontoauszuege und Belege zusammenstellen.',at:'Sehr geehrter Herr Franke,
+  {id:3,from:'info@steuerberater-franke.de',org:'Steuerberater_Franke',subj:'Unterlagen Jahresabschluss 2025',t:'Gestern',prio:'pm',pl:'Muss gemacht werden',ak:'Unterlagen zusammenstellen',bg:'Zweite Erinnerung. Frist naehert sich.',wt:'Kontoauszuege und Belege 2025.',at:'Sehr geehrter Herr Franke,
 
 Unterlagen folgen bis Ende der Woche.
 
 Mit freundlichen Gruessen
 Ole Reinpold',or:'EHC / Finanzen',ah:null,r:0,fb:'',d:false},
-{id:4,from:'news@medtech-messe.de',org:'MedTech_Messe',subject:'MedTech Summit Hamburg 2026',time:'Gestern',prio:'p-n',pl:'Nice to have',ak:'Kenntnisnahme',bg:'Newsletter.',wt:'Datum vormerken.',at:'',or:'Kein Anhang',ah:null,r:0,fb:'',d:false},
-{id:5,from:'lasse@qodia.de',org:'Qodia',subject:'Update Investorengespraech',time:'Mo',prio:'p-f',pl:'Nachhalten',ak:'Bestaetigung abwarten',bg:'Update Mitgruender Lasse.',wt:'Kalender pruefen.',at:'Hi Lasse, danke, passt. Ole',or:'Qodia / Investoren',ah:null,r:0,fb:'',d:false}
+  {id:4,from:'news@medtech-messe.de',org:'MedTech_Messe',subj:'MedTech Summit Hamburg 2026',t:'Gestern',prio:'pn',pl:'Nice to have',ak:'Kenntnisnahme',bg:'Newsletter.',wt:'Datum vormerken.',at:'',or:'Kein Anhang',ah:null,r:0,fb:'',d:false},
+  {id:5,from:'lasse@qodia.de',org:'Qodia',subj:'Update Investorengespraech',t:'Mo',prio:'pf',pl:'Nachhalten',ak:'Bestaetigung abwarten',bg:'Update Mitgruender Lasse.',wt:'Kalender pruefen.',at:'Hi Lasse, danke, passt. Ole',or:'Qodia / Investoren',ah:null,r:0,fb:'',d:false}
 ];
 var sel=null;
 function ds(){var d=new Date();return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
 function fn(m){if(!m.ah)return null;var p=m.ah.split('.');var e=p.pop();return ds()+'_'+m.org+'_'+p.join('.')+'.'+e;}
 function toast(s){var t=document.getElementById('toast');t.textContent=s;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2200);}
-function renderSidebar(){
+function rs(){
   var p=M.filter(function(m){return !m.d;}).length;
   document.getElementById('badge').textContent=p+' ausstehend';
-  document.getElementById('sc').textContent=M.length+' Mails';
+  document.getElementById('sc').textContent=M.length;
   document.getElementById('slist').innerHTML=M.map(function(m){
     return '<div class="mr'+(m.d?' done':'')+(sel&&sel.id===m.id?' active':'')+'" onclick="pick('+m.id+')">'
-      +'<div class="mt"><span class="prio '+m.prio+'">'+m.pl+'</span><span class="mti">'+m.time+'</span></div>'
-      +'<div class="msub">'+m.subject+'</div><div class="mfr">'+m.from+'</div></div>';
+      +'<div class="mt"><span class="prio '+m.prio+'">'+m.pl+'</span><span class="mtime">'+m.t+'</span></div>'
+      +'<div class="msubj">'+m.subj+'</div><div class="mfrom">'+m.from+'</div></div>';
   }).join('');
 }
-function renderDetail(){
+function rd(){
   var det=document.getElementById('det');
-  if(!sel){det.innerHTML='<div class="empty"><div class="ei">&#x2709;</div><div class="et">Mail ausw&auml;hlen</div></div>';return;}
-  var m=sel;var f=fn(m);
+  if(!sel){det.innerHTML='<div class="empty"><span style="font-size:32px;opacity:0.15">&#x2709;</span><span style="font-size:12px">Mail auswaehlen</span></div>';return;}
+  var m=sel,f=fn(m);
   var SL=['','Falsch','Eher falsch','Teilweise','Gut','Perfekt'];
-  var h='<div class="dh"><div class="di"><div class="dsubj">'+m.subject+'</div><div class="dfrom">'+m.from+' &middot; '+m.time+'</div></div><span class="prio '+m.prio+'">'+m.pl+'</span></div>';
+  var h='<div class="dhead"><div class="dinfo"><div class="dsubj">'+m.subj+'</div><div class="dfrom">'+m.from+' &middot; '+m.t+'</div></div><span class="prio '+m.prio+'">'+m.pl+'</span></div>';
   h+='<div class="dbody">';
-  h+='<div class="g3"><div class="card"><div class="lbl">Aktion</div><div class="cv">'+m.ak+'</div></div><div class="card"><div class="lbl">Begruendung</div><div class="cv">'+m.bg+'</div></div><div class="card"><div class="lbl">Weitere Aktionen</div><div class="cv cvm">'+m.wt+'</div></div></div>';
+  h+='<div class="g3">'
+    +'<div><div class="lbl">Aktion</div><div class="card">'+m.ak+'</div></div>'
+    +'<div><div class="lbl">Begruendung</div><div class="card">'+m.bg+'</div></div>'
+    +'<div><div class="lbl">Weitere Aktionen</div><div class="card" style="color:#888">'+m.wt+'</div></div>'
+    +'</div>';
   h+='<div><div class="lbl">Antwortvorschlag</div><textarea id="ta'+m.id+'" rows="9">'+m.at+'</textarea></div>';
-  h+='<div class="g2"><div><div class="lbl">OneDrive Ordner</div><select id="fs'+m.id+'">'+F.map(function(x){return '<option'+(x===m.or?' selected':'')+'>'+x+'</option>';}).join('')+'</select>';
-  h+=(f?'<div class="fnp"><span class="fnx">'+ds()+'_'+m.org+'_</span>'+m.ah.split('.').slice(0,-1).join('.')+'.'+m.ah.split('.').pop()+'</div>':'<div style="font-size:10px;color:var(--muted);margin-top:6px">Kein Anhang</div>')+'</div>';
-  h+='<div class="fbw"><div class="lbl">Feedback KI-Training</div><div class="stars">'+[1,2,3,4,5].map(function(i){return '<span class="star'+(i<=m.r?' on':'')+'" onclick="rate('+m.id+','+i+')" onmouseenter="hs('+m.id+','+i+')" onmouseleave="hs('+m.id+',0)">&#9733;</span>';}).join('')+'<span class="slbl" id="slbl'+m.id+'">'+(m.r?SL[m.r]:'')+'</span></div>';
-  h+='<textarea rows="3" placeholder="Was war falsch?" style="font-size:11px;min-height:60px" id="fb'+m.id+'">'+m.fb+'</textarea></div></div></div>';
-  h+='<div class="dft"><button class="btn bc" onclick="conf('+m.id+')">&#10003; Bestaetigen</button><button class="btn bo" onclick="ol('+m.id+')">&#x2709; In Outlook</button><button class="btn bs" onclick="save('+m.id+')">Entwurf</button><span class="sok" id="ok'+m.id+'">gespeichert</span><button class="btn bsk" onclick="skip('+m.id+')">&#8594;</button></div>';
+  h+='<div class="g2"><div>'
+    +'<div class="lbl">OneDrive Ordner</div>'
+    +'<select id="fs'+m.id+'">'+F.map(function(x){return '<option'+(x===m.or?' selected':'')+'>'+x+'</option>';}).join('')+'</select>'
+    +(f?'<div class="fname"><span class="fnx">'+ds()+'_'+m.org+'_</span>'+m.ah.split('.').slice(0,-1).join('.')+'.'+m.ah.split('.').pop()+'</div>':'<div style="font-size:10px;color:#444;margin-top:5px">Kein Anhang</div>')
+    +'</div>';
+  h+='<div class="fbbox"><div class="lbl">Feedback KI-Training</div>'
+    +'<div class="stars">'
+    +[1,2,3,4,5].map(function(i){return '<span class="star'+(i<=m.r?' on':'')+'" onclick="rate('+m.id+','+i+')" onmouseenter="hs('+m.id+','+i+')" onmouseleave="hs('+m.id+',0)">&#9733;</span>';}).join('')
+    +'<span class="slbl" id="slbl'+m.id+'">'+(m.r?SL[m.r]:'')+'</span></div>'
+    +'<textarea rows="3" placeholder="Was war falsch?" style="font-size:11px" id="fb'+m.id+'">'+m.fb+'</textarea>'
+    +'</div></div></div>';
+  h+='<div class="dfoot">'
+    +'<button class="btn bconf" onclick="conf('+m.id+')">&#10003; Bestaetigen</button>'
+    +'<button class="btn bol" onclick="ol('+m.id+')">&#x2709; In Outlook</button>'
+    +'<button class="btn bsave" onclick="save('+m.id+')">Entwurf</button>'
+    +'<span class="sok" id="ok'+m.id+'">&#10003; gespeichert</span>'
+    +'<button class="btn bskip" onclick="skip('+m.id+')">&#8594; Ueberspringen</button>'
+    +'</div>';
   det.innerHTML=h;
 }
-function pick(id){sel=M.find(function(m){return m.id===id;});renderSidebar();renderDetail();}
-function hs(id,n){var m=M.find(function(x){return x.id===id;});var L=['','Falsch','Eher falsch','Teilweise','Gut','Perfekt'];document.querySelectorAll('[id^="st'+id+'"]').forEach(function(s,i){s.className='star'+(i+1<=(n||m.r)?' on':'');});var l=document.getElementById('slbl'+id);if(l)l.textContent=n?L[n]:(m.r?L[m.r]:'');}
+function pick(id){sel=M.find(function(m){return m.id===id;});rs();rd();}
+function hs(id,n){var m=M.find(function(x){return x.id===id;});var L=['','Falsch','Eher falsch','Teilweise','Gut','Perfekt'];document.querySelectorAll('[onclick^="rate('+id+'"]').forEach(function(s,i){s.className='star'+(i+1<=(n||m.r)?' on':'');});var l=document.getElementById('slbl'+id);if(l)l.textContent=n?L[n]:(m.r?L[m.r]:'');}
 function rate(id,r){M.find(function(x){return x.id===id;}).r=r;hs(id,0);}
-function save(id){var m=M.find(function(x){return x.id===id;});var ta=document.getElementById('ta'+id);var fb=document.getElementById('fb'+id);var fs=document.getElementById('fs'+id);if(ta)m.at=ta.value;if(fb)m.fb=fb.value;if(fs)m.or=fs.value;var ok=document.getElementById('ok'+id);if(ok){ok.style.display='block';setTimeout(function(){ok.style.display='none';},2000);}}
-function conf(id){save(id);M.find(function(x){return x.id===id;}).d=true;toast('Abgelegt');sel=M.find(function(x){return !x.d;})||null;renderSidebar();renderDetail();}
-function skip(id){var i=M.findIndex(function(x){return x.id===id;});sel=M.find(function(x,j){return j>i&&!x.d;})||M.find(function(x,j){return j<i&&!x.d;})||null;renderSidebar();renderDetail();}
-function ol(id){var m=M.find(function(x){return x.id===id;});var ta=document.getElementById('ta'+id);window.open('mailto:'+m.from+'?subject='+encodeURIComponent('AW: '+m.subject)+'&body='+encodeURIComponent(ta?ta.value:m.at),'_self');}
+function save(id){var m=M.find(function(x){return x.id===id;});var ta=document.getElementById('ta'+id),fb=document.getElementById('fb'+id),fs=document.getElementById('fs'+id);if(ta)m.at=ta.value;if(fb)m.fb=fb.value;if(fs)m.or=fs.value;var ok=document.getElementById('ok'+id);if(ok){ok.style.display='block';setTimeout(function(){ok.style.display='none';},2000);}}
+function conf(id){save(id);M.find(function(x){return x.id===id;}).d=true;toast('Abgelegt');sel=M.find(function(x){return !x.d;})||null;rs();rd();}
+function skip(id){var i=M.findIndex(function(x){return x.id===id;});sel=M.find(function(x,j){return j>i&&!x.d;})||M.find(function(x,j){return j<i&&!x.d;})||null;rs();rd();}
+function ol(id){var m=M.find(function(x){return x.id===id;});var ta=document.getElementById('ta'+id);window.open('mailto:'+m.from+'?subject='+encodeURIComponent('AW: '+m.subj)+'&body='+encodeURIComponent(ta?ta.value:m.at),'_self');}
 function refreshMails(){toast('Demo - SharePoint noch nicht verbunden');}
+function init(){rs();pick(1);}
 </script>
 </body>
 </html>
