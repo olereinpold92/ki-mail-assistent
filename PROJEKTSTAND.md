@@ -5,53 +5,45 @@
 - Prokurist/GF: Elbe Hernien Centrum EHC GmbH (kurz: EHC)
 - Mitgruender/GF: Qodia GmbH
 - E-Mail: o.reinpold@hernie.de (Microsoft 365 Business Standard)
-- Arbeitsstil: Ole navigiert selbst, Claude gibt direkte Schritt-fuer-Schritt-Anweisungen
+- Arbeitsstil: Ole macht einfache Klicks selbst, Claude uebernimmt komplexe Konfigurationen und Code.
 
 ## Langfristiges Ziel
 E-Mail ist Schritt 1 zur vollstaendigen Automatisierung des Arbeitsalltags.
-Danach: Kalender, Dokumente, Aufgaben, Buchhaltung etc.
 
 ## KI Mail Assistent – Ziel
-- Jeden Morgen Interface oeffnen
-- Alle neuen Mails sehen + KI-Analyse (Prioritaet, Aktion, Antwortvorschlag, Begruendung)
-- Mit einem Klick: antworten, Anhang in OneDrive ablegen, Mail in Outlook-Ordner verschieben
-- Feedback (Sterne + Text) damit System lernt
+- Jeden Morgen Interface oeffnen, neue Mails sehen, KI-Analyse lesen
+- Pro Mail: Prioritaet, Aktion, Antwortvorschlag, Begruendung
+- Mit einem Klick: antworten, Anhang in OneDrive, Mail in Outlook-Ordner
+- Feedback (Sterne + Text) zum KI-Training
 - Dateiformat: JJMMTT_Organisation_Dateiname.ext
 - Prioritaeten: Wichtig & Dringend / Wichtig / Muss gemacht werden / Nice to have / Nachhalten
 
 ## Tech Stack
-- HTML + CSS + Vanilla JS (keine Frameworks)
-- GitHub: olereinpold92/ki-mail-assistent
+- HTML + CSS + Vanilla JS, GitHub: olereinpold92/ki-mail-assistent
 - Netlify: https://bright-cannoli-eeaa45.netlify.app / Login: EHC2026
 - Dateien: index.html, app.js, netlify.toml
-- Code-Updates immer direkt ueber GitHub API (Token ohne Ablauf), nie ueber Browser-Editor
+- GitHub Token: in 1Password gespeichert (kein Ablauf)
+- WICHTIG: Netlify Auto-Deploy ist DEAKTIVIERT. Nach Code-Push manuell deployen: Netlify -> Deploys -> Trigger deploy
 
 ## Azure / Microsoft
 - App: KI Mail Assistent EHC
 - Client ID: aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0
 - Tenant ID: 710620de-9a6b-4cca-bf53-99ce2a3e407f
-- Redirect URI: https://bright-cannoli-eeaa45.netlify.app (Typ: SPA)
-- Berechtigungen: User.Read (ok), Mail.ReadWrite (ok), Files.ReadWrite (FEHLT), Administratorzustimmung (FEHLT)
+- Redirect URI: https://bright-cannoli-eeaa45.netlify.app/ (SPA)
+- Berechtigungen: User.Read, Mail.ReadWrite, Mail.Send, Files.ReadWrite + Adminzustimmung erteilt
 
-## Power Automate
-- Flow ID: 6ce87867-8356-4683-b44a-6d3157347227
-- Trigger: neue Mail an o.reinpold@hernie.de
-- Aktion: Claude API (claude-sonnet-4-6) analysiert Mail, gibt JSON zurueck
-- JSON-Felder: prioritaet, aktion, antwortvorschlag, email_ordner, onedrive_ordner, begruendung
-- Status: laeuft, aber Ergebnis wird noch nicht gespeichert/angezeigt
+## Aktueller Stand (24.03.2026)
+- Login (EHC2026) funktioniert
+- Microsoft OAuth funktioniert, Token in sessionStorage
+- Echte Mails laden via Graph API
+- CSP in netlify.toml erlaubt graph.microsoft.com und api.anthropic.com
 
-## OneDrive Ordnerstruktur (Dropdown im Interface)
-EHC: Eingangsrechnungen, Vertraege, Korrespondenz, Personal, Finanzen, OP-Dokumentation
-Qodia: Allgemein, Investoren, Vertraege
-Privat: Allgemein
-Kein Anhang
+## Offene Punkte – naechste Session
+1. BUG: KI-Features (Antwort, Analyse) funktionieren nur bei einer Mail – escId()-Problem mit langen Graph IDs
+2. UI komplett ueberarbeiten – besseres Design und Layout
+3. KI-Analyse beim Laden verbessern
+4. Mail in Outlook-Ordner verschieben via Graph API
+5. Anhang in OneDrive ablegen via Graph API
 
-## Naechste Schritte (Prioritaet)
-1. Azure: Files.ReadWrite hinzufuegen + Administratorzustimmung erteilen
-2. app.js: OAuth Implicit Flow (kein MSAL noetig) einbauen – Microsoft verbinden Button
-3. Echte Mails via Microsoft Graph API laden statt Demo-Daten
-4. Mail verschieben + Anhang in OneDrive ablegen via Graph API
-5. Power Automate Analyse ins Interface bringen
-
-## So startest du einen neuen Chat
-Schreib: "Lies PROJEKTSTAND.md aus github.com/olereinpold92/ki-mail-assistent und mach weiter"
+## Neuen Chat starten
+Lies PROJEKTSTAND.md und app.js aus github.com/olereinpold92/ki-mail-assistent und mach weiter.
