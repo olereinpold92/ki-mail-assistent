@@ -18,3 +18,1325 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .login-box button{width:100%;padding:11px;background:#c9a96e;color:#111;border:none;border-radius:7px;font-size:14px;cursor:pointer;font-weight:600}
 .login-box button:hover{background:#d4b896}
 #err{color:#f87171;font-size:12px;margin-top:8px;display:none}
+
+/* MAIN */
+#mainpage{display:none;flex-direction:column;height:100vh}
+
+/* TOPBAR */
+.topbar{height:44px;display:flex;align-items:center;padding:0 12px;background:#161616;border-bottom:1px solid #252525;gap:6px;flex-shrink:0}
+.logo{font-size:11px;letter-spacing:0.12em;color:#c9a96e;font-weight:700;font-family:monospace;white-space:nowrap}
+.spacer{flex:1}
+#badge{font-size:11px;color:#fbbf24;font-family:monospace;white-space:nowrap}
+.tbtn{font-size:11px;padding:4px 10px;background:#1e1e1e;color:#777;border:1px solid #2a2a2a;border-radius:4px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.tbtn:hover{color:#e0e0e0;background:#252525}
+.tbtn-ms{background:rgba(0,120,212,0.12);color:#60a5fa;border-color:rgba(0,120,212,0.25)}
+.tbtn-disc{background:rgba(239,68,68,0.1);color:#f87171;border-color:rgba(239,68,68,0.2);display:none}
+.tbtn-red{color:#f87171}
+
+/* LAYOUT */
+.layout{display:flex;height:calc(100vh - 44px);overflow:hidden}
+
+/* PANELS */
+.panel{display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;position:relative;min-width:36px}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:0 10px;height:32px;background:#161616;border-bottom:1px solid #222;flex-shrink:0}
+.panel-title{font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.1em;font-family:monospace;white-space:nowrap}
+.panel-actions{display:flex;align-items:center;gap:5px}
+.collapse-btn{background:none;border:none;cursor:pointer;color:#444;font-size:13px;padding:0 2px;line-height:1}
+.collapse-btn:hover{color:#888}
+
+/* Collapsed panel */
+.panel.collapsed .panel-body{display:none}
+.panel.collapsed{min-width:32px;width:32px!important;flex-shrink:0}
+.panel.collapsed .panel-header{writing-mode:vertical-lr;height:100%;padding:12px 8px;cursor:pointer;justify-content:flex-start}
+.panel.collapsed .panel-title{transform:rotate(180deg);writing-mode:vertical-lr}
+.panel.collapsed .panel-actions{display:none}
+.panel-body{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+/* RESIZE HANDLE */
+.rh{width:5px;background:transparent;cursor:col-resize;flex-shrink:0;position:relative;z-index:10}
+.rh::after{content:'';position:absolute;top:0;bottom:0;left:2px;width:1px;background:#222;transition:background 0.15s}
+.rh:hover::after,.rh.active::after{background:#c9a96e}
+
+/* PANEL 1: ORDNER */
+#p-folders{width:200px;border-right:1px solid #1e1e1e}
+.folder-list{overflow-y:auto;flex:1;padding:4px 0}
+.folder-list::-webkit-scrollbar{width:3px}
+.folder-list::-webkit-scrollbar-thumb{background:#222}
+.fg{margin-bottom:1px}
+.fg-head{display:flex;align-items:center;gap:5px;padding:5px 8px;font-size:11px;color:#555;cursor:pointer;font-weight:600;border-radius:3px;margin:0 3px}
+.fg-head:hover{color:#aaa;background:#1a1a1a}
+.fg-arrow{font-size:9px;transition:transform 0.15s;flex-shrink:0}
+.fg.open .fg-arrow{transform:rotate(90deg)}
+.fg-items{display:none}
+.fg.open .fg-items{display:block}
+.fi{display:flex;align-items:center;gap:5px;padding:4px 8px 4px 20px;font-size:11px;color:#4a4a4a;cursor:pointer;border-radius:3px;margin:1px 3px}
+.fi:hover{background:#1a1a1a;color:#999}
+.fi.active{background:#1e1e1e;color:#c9a96e}
+.fi-cnt{margin-left:auto;font-size:9px;color:#333;font-family:monospace}
+
+/* PANEL 2: MAIL-LISTE */
+#p-list{width:260px;border-right:1px solid #1e1e1e}
+#slist{overflow-y:auto;flex:1}
+#slist::-webkit-scrollbar{width:3px}
+#slist::-webkit-scrollbar-thumb{background:#222}
+.mr{padding:10px 11px;border-bottom:1px solid #1a1a1a;cursor:pointer;transition:background 0.1s}
+.mr:hover{background:#181818}
+.mr.active{background:#1e1e1e;border-left:2px solid #c9a96e;padding-left:9px}
+.mr.done{opacity:0.28}
+.mt{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.pb{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.pu{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.2)}
+.pi{background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.18)}
+.pm{background:rgba(96,165,250,0.1);color:#60a5fa;border:1px solid rgba(96,165,250,0.15)}
+.pn{background:rgba(107,114,128,0.1);color:#6b7280;border:1px solid rgba(107,114,128,0.15)}
+.pf{background:rgba(201,169,110,0.1);color:#c9a96e;border:1px solid rgba(201,169,110,0.15)}
+.mtime{font-size:9px;color:#333;margin-left:auto;font-family:monospace}
+.msubj{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;color:#bbb}
+.mr.unread .msubj{font-weight:700;color:#f0f0f0}
+.mfrom{font-size:11px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mr.unread .mfrom{color:#666}
+
+/* PANEL 3: MAIL-INHALT */
+#p-body{flex:1;border-right:1px solid #1e1e1e;min-width:80px}
+.mail-top{padding:13px 16px;background:#141414;border-bottom:1px solid #1e1e1e;flex-shrink:0}
+.mail-subj{font-size:15px;font-weight:600;color:#f0f0f0;margin-bottom:6px;line-height:1.3}
+.mail-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.mail-from-txt{font-size:12px;color:#555}
+.mail-from-txt strong{color:#888}
+.mail-dt{font-size:11px;color:#333;font-family:monospace}
+.mail-atts{margin-top:7px;display:flex;flex-wrap:wrap;gap:5px}
+.att-chip{display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #252525;border-radius:4px;padding:3px 8px;font-size:11px;color:#777}
+.att-chip span{color:#c9a96e}
+.mail-html{flex:1;overflow-y:auto;padding:16px;font-size:13px;line-height:1.75;color:#888;user-select:text}
+.mail-html::-webkit-scrollbar{width:4px}
+.mail-html::-webkit-scrollbar-thumb{background:#222}
+.mail-html p{margin-bottom:10px}
+.mail-html a{color:#60a5fa}
+.mail-html strong{color:#aaa}
+.mail-html ul,.mail-html ol{margin:8px 0 8px 20px}
+.mail-html li{margin-bottom:4px}
+
+/* PANEL 4: KI */
+#p-ki{width:400px;min-width:80px}
+.ki-scroll{overflow-y:auto;flex:1;padding:10px}
+.ki-scroll::-webkit-scrollbar{width:3px}
+.ki-scroll::-webkit-scrollbar-thumb{background:#222}
+.ki-sec{background:#141414;border:1px solid #1e1e1e;border-radius:6px;padding:10px 11px;margin-bottom:9px}
+.ki-sec-title{font-size:9px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:0.1em;font-family:monospace;margin-bottom:8px}
+
+/* Prio Buttons */
+.prio-row{display:flex;gap:5px;flex-wrap:wrap}
+.po{font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;border:1px solid transparent;font-weight:600;opacity:0.35;transition:opacity 0.12s}
+.po:hover{opacity:0.65}
+.po.sel{opacity:1}
+.po-pu{background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.2)}
+.po-pi{background:rgba(251,191,36,0.12);color:#fbbf24;border-color:rgba(251,191,36,0.18)}
+.po-pm{background:rgba(96,165,250,0.1);color:#60a5fa;border-color:rgba(96,165,250,0.15)}
+.po-pn{background:rgba(107,114,128,0.1);color:#6b7280;border-color:rgba(107,114,128,0.15)}
+.po-pf{background:rgba(201,169,110,0.1);color:#c9a96e;border-color:rgba(201,169,110,0.15)}
+
+/* KI Info cards */
+.ki-card{font-size:12px;color:#777;line-height:1.5;padding:7px 9px;background:#111;border-radius:4px;border:1px solid #1a1a1a;margin-bottom:5px}
+.ki-card b{font-size:9px;color:#444;font-family:monospace;letter-spacing:0.05em;display:block;margin-bottom:3px}
+.ki-card.dark{color:#555}
+
+/* Ablegen-Bereich (Mail + Anhänge kombiniert) */
+.ablegen-section{}
+.ablegen-row{display:flex;align-items:center;gap:6px;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid #1a1a1a}
+.ablegen-row:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.ablegen-icon{font-size:14px;flex-shrink:0;width:20px;text-align:center}
+.ablegen-info{flex:1;min-width:0}
+.ablegen-label{font-size:10px;color:#555;font-family:monospace;margin-bottom:4px}
+.ablegen-name{font-size:11px;color:#888;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ablegen-name-input{width:100%;background:#0f0f0f;color:#c9a96e;border:1px solid #252525;border-radius:3px;padding:3px 7px;font-size:11px;font-family:monospace;outline:none;user-select:text}
+.ablegen-name-input:focus{border-color:#3a3a3a}
+.ablegen-sel{width:100%;background:#0f0f0f;color:#e0e0e0;border:1px solid #252525;border-radius:3px;padding:4px 7px;font-size:11px;outline:none;cursor:pointer;margin-top:4px}
+.ablegen-sel:focus{border-color:#3a3a3a}
+.ablegen-btn{font-size:10px;padding:4px 9px;background:rgba(96,165,250,0.1);color:#60a5fa;border:1px solid rgba(96,165,250,0.2);border-radius:3px;cursor:pointer;white-space:nowrap;flex-shrink:0;align-self:flex-end}
+.ablegen-btn:hover{background:rgba(96,165,250,0.18)}
+
+/* Antwort */
+.reply-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.ki-gen-btn{font-size:10px;padding:4px 10px;background:rgba(201,169,110,0.12);color:#c9a96e;border:1px solid rgba(201,169,110,0.2);border-radius:4px;cursor:pointer;font-weight:600}
+.ki-gen-btn:hover{background:rgba(201,169,110,0.2)}
+.ki-gen-btn:disabled{opacity:0.4;cursor:not-allowed}
+textarea{width:100%;background:#111;color:#e0e0e0;border:1px solid #222;border-radius:5px;padding:9px 10px;font-size:12px;font-family:inherit;line-height:1.65;outline:none;user-select:text;resize:vertical}
+textarea:focus{border-color:#333}
+.reply-btns{display:flex;gap:6px;margin-top:7px}
+
+/* Feedback */
+.fb-row{display:flex;gap:7px;margin-bottom:8px}
+.fb-btn{flex:1;padding:7px 6px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;border:1px solid transparent;text-align:center;transition:all 0.12s}
+.fb-yes{background:rgba(94,234,212,0.08);color:#5eead4;border-color:rgba(94,234,212,0.15)}
+.fb-yes:hover,.fb-yes.sel{background:rgba(94,234,212,0.18);border-color:#5eead4}
+.fb-no{background:rgba(239,68,68,0.08);color:#f87171;border-color:rgba(239,68,68,0.15)}
+.fb-no:hover,.fb-no.sel{background:rgba(239,68,68,0.16);border-color:#f87171}
+#fb-detail{display:none;margin-top:1px}
+
+/* Buttons */
+.btn{font-size:11px;padding:7px 13px;border-radius:5px;cursor:pointer;font-weight:500;border:none;font-family:inherit;white-space:nowrap}
+.b-conf{background:#5eead4;color:#0f0f0f}.b-conf:hover{background:#4dd9c3}
+.b-send{background:rgba(96,165,250,0.1);color:#60a5fa;border:1px solid rgba(96,165,250,0.2)}.b-send:hover{background:rgba(96,165,250,0.18)}
+.b-draft{background:transparent;color:#555;border:1px solid #252525}.b-draft:hover{color:#e0e0e0}
+.b-skip{background:transparent;color:#f87171;border:1px solid rgba(239,68,68,0.2)}.b-skip:hover{background:rgba(239,68,68,0.08)}
+.ki-footer{display:flex;gap:6px;padding-top:2px}
+
+/* Wiederkehrend */
+.recurring-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#111;border-radius:5px;border:1px solid #1a1a1a;cursor:pointer}
+.recurring-row:hover{border-color:#2a2a2a}
+.toggle{width:32px;height:18px;background:#2a2a2a;border-radius:9px;position:relative;cursor:pointer;flex-shrink:0;transition:background 0.2s}
+.toggle.on{background:rgba(201,169,110,0.5)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;background:#555;border-radius:50%;transition:transform 0.2s,background 0.2s}
+.toggle.on::after{transform:translateX(14px);background:#c9a96e}
+.recurring-label{font-size:11px;color:#666;flex:1}
+.toggle.on + .recurring-label{color:#c9a96e}
+.recurring-interval{font-size:11px;background:#0f0f0f;color:#e0e0e0;border:1px solid #2a2a2a;border-radius:4px;padding:3px 7px;outline:none;cursor:pointer;display:none}
+.recurring-interval.show{display:block}
+
+/* Aufgaben (Todo) */
+.todo-list{display:flex;flex-direction:column;gap:5px;margin-bottom:7px}
+.todo-item{display:flex;align-items:flex-start;gap:7px;background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:6px 8px}
+.todo-item input[type=checkbox]{width:14px;height:14px;margin-top:2px;flex-shrink:0;cursor:pointer;accent-color:#c9a96e}
+.todo-item.done-task .todo-text{text-decoration:line-through;color:#444}
+.todo-text{font-size:12px;color:#bbb;flex:1;line-height:1.4;user-select:text}
+.todo-del{background:none;border:none;color:#333;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;flex-shrink:0}
+.todo-del:hover{color:#f87171}
+.todo-add-row{display:flex;gap:5px;margin-top:4px}
+.todo-add-input{flex:1;background:#0f0f0f;color:#e0e0e0;border:1px solid #252525;border-radius:4px;padding:5px 8px;font-size:11px;outline:none;user-select:text}
+.todo-add-input:focus{border-color:#3a3a3a}
+.todo-add-btn{font-size:11px;padding:4px 10px;background:rgba(201,169,110,0.1);color:#c9a96e;border:1px solid rgba(201,169,110,0.15);border-radius:4px;cursor:pointer}
+.todo-add-btn:hover{background:rgba(201,169,110,0.18)}
+.todo-hint{font-size:10px;color:#333;margin-bottom:5px;font-family:monospace}
+
+/* Collapsible KI section */
+.ki-sec-collapsible .ki-sec-body{overflow:hidden;transition:max-height 0.2s ease}
+.ki-sec-collapsible.collapsed .ki-sec-body{max-height:0!important}
+.ki-sec-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0}
+.ki-sec-header:hover .ki-toggle-arrow{color:#888}
+.ki-toggle-arrow{font-size:10px;color:#444;transition:transform 0.2s}
+.ki-sec-collapsible:not(.collapsed) .ki-toggle-arrow{transform:rotate(90deg)}
+
+/* Keine Antwort Button */
+.no-reply-btn{font-size:10px;padding:3px 9px;background:rgba(107,114,128,0.1);color:#6b7280;border:1px solid rgba(107,114,128,0.2);border-radius:4px;cursor:pointer}
+.no-reply-btn:hover{background:rgba(107,114,128,0.18);color:#9ca3af}
+.no-reply-btn.active{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.2)}
+.no-reply-note{font-size:11px;color:#5eead4;padding:8px 10px;background:rgba(94,234,212,0.05);border:1px solid rgba(94,234,212,0.1);border-radius:4px;text-align:center}
+
+/* Neuer Unterordner */
+.new-folder-row{display:flex;align-items:center;gap:5px;margin-top:5px}
+.new-folder-input{flex:1;background:#0f0f0f;color:#e0e0e0;border:1px solid #252525;border-radius:4px;padding:4px 8px;font-size:11px;outline:none;placeholder-color:#444;user-select:text}
+.new-folder-input:focus{border-color:#3a3a3a}
+.new-folder-btn{font-size:10px;padding:4px 9px;background:rgba(94,234,212,0.08);color:#5eead4;border:1px solid rgba(94,234,212,0.15);border-radius:3px;cursor:pointer;white-space:nowrap}
+.new-folder-btn:hover{background:rgba(94,234,212,0.15)}
+.new-folder-toggle{font-size:11px;color:#444;cursor:pointer;padding:2px 4px}
+.new-folder-toggle:hover{color:#888}
+
+/* CONFIRM ALL - großer Button */
+.b-confirm-all{width:100%;padding:11px;background:#5eead4;color:#0f0f0f;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:0.02em;transition:background 0.15s}
+.b-confirm-all:hover{background:#4dd9c3}
+.b-confirm-all:active{background:#3dc8b2}
+.confirm-info{font-size:10px;color:#444;text-align:center;margin-top:5px;font-family:monospace;line-height:1.5}
+
+/* Empty */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:#252525}
+.empty span{font-size:36px}
+.empty p{font-size:12px}
+
+/* Toast */
+.toast{position:fixed;bottom:16px;right:16px;padding:9px 14px;background:#1e1e1e;border:1px solid #333;border-radius:6px;font-size:11px;color:#5eead4;opacity:0;transform:translateY(6px);transition:all 0.18s;pointer-events:none;z-index:999;font-family:monospace}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* Config Modal */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(3px)}
+.modal{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:26px;width:440px;max-width:95vw}
+.modal h3{font-size:14px;font-weight:600;margin-bottom:5px}
+.modal .sub{font-size:11px;color:#555;margin-bottom:14px;line-height:1.5}
+.minfo{background:rgba(0,120,212,0.08);border:1px solid rgba(0,120,212,0.15);border-radius:5px;padding:9px 11px;font-size:11px;color:#60a5fa;line-height:1.6;margin-bottom:14px}
+.mf{margin-bottom:11px}
+.mf label{display:block;font-size:10px;color:#555;font-family:monospace;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
+.mf input{width:100%;background:#111;color:#e0e0e0;border:1px solid #252525;border-radius:5px;padding:8px 10px;font-size:12px;font-family:monospace;outline:none;user-select:text}
+.mf input:focus{border-color:#3a3a3a}
+.mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.mb{font-size:12px;padding:7px 16px;border-radius:5px;cursor:pointer;border:none;font-family:inherit;font-weight:500}
+.mb-save{background:#c9a96e;color:#111}.mb-save:hover{background:#d4b896}
+.mb-cancel{background:transparent;color:#555;border:1px solid #252525}.mb-cancel:hover{color:#e0e0e0}
+</style>
+</head>
+<body>
+
+<div id="loginpage">
+  <div class="login-box">
+    <h2>KI Mail Assistent</h2>
+    <p>EHC &bull; Nur fuer autorisierte Nutzer</p>
+    <input type="password" id="pw" placeholder="Passwort" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">Einloggen</button>
+    <div id="err">Falsches Passwort</div>
+  </div>
+</div>
+
+<div id="mainpage">
+  <div class="topbar">
+    <span class="logo">EHC &bull; KI MAIL</span>
+    <div class="spacer"></div>
+    <span id="badge">–</span>
+    <button class="tbtn tbtn-ms" id="msftbtn" onclick="connectMicrosoft()">⬡ Microsoft verbinden</button>
+    <button class="tbtn tbtn-disc" id="msftdisc" onclick="disconnectMicrosoft()">✕ Trennen</button>
+    <button class="tbtn" onclick="refreshMails()" title="Neu laden">↺</button>
+    <button class="tbtn" onclick="openConfig()">⚙ Config</button>
+    <button class="tbtn tbtn-red" onclick="logout()">Abmelden</button>
+  </div>
+
+  <div class="layout" id="layout">
+
+    <!-- ORDNER -->
+    <div class="panel" id="p-folders">
+      <div class="panel-header" onclick="handleHeaderClick('p-folders',event)">
+        <span class="panel-title">Ordner</span>
+        <div class="panel-actions">
+          <button class="collapse-btn" title="Zuklappen">‹</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="folder-list" id="folder-list"></div>
+      </div>
+    </div>
+    <div class="rh" id="rh1" data-panel="p-folders" data-dir="right"></div>
+
+    <!-- MAIL-LISTE -->
+    <div class="panel" id="p-list">
+      <div class="panel-header" onclick="handleHeaderClick('p-list',event)">
+        <span class="panel-title">Posteingang</span>
+        <div class="panel-actions">
+          <span id="sc" style="font-size:10px;color:#333;font-family:monospace">0</span>
+          <button class="collapse-btn" title="Zuklappen">‹</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="slist"></div>
+      </div>
+    </div>
+    <div class="rh" id="rh2" data-panel="p-list" data-dir="right"></div>
+
+    <!-- MAIL-INHALT -->
+    <div class="panel" id="p-body" style="flex:1">
+      <div class="panel-header" onclick="handleHeaderClick('p-body',event)">
+        <span class="panel-title">E-Mail</span>
+        <div class="panel-actions">
+          <button class="collapse-btn" title="Zuklappen">‹</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="mailbody" style="display:flex;flex-direction:column;height:100%">
+          <div class="empty"><span>✉</span><p>E-Mail auswaehlen</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="rh" id="rh3" data-panel="p-ki" data-dir="left"></div>
+
+    <!-- KI PANEL -->
+    <div class="panel" id="p-ki">
+      <div class="panel-header" onclick="handleHeaderClick('p-ki',event)">
+        <span class="panel-title" style="color:#c9a96e90">✦ KI Assistent</span>
+        <div class="panel-actions">
+          <button class="collapse-btn" title="Zuklappen">›</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="ki-scroll" id="kipanel">
+          <div class="empty"><span style="font-size:26px">✦</span><p>E-Mail auswaehlen</p></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONFIG -->
+<div class="modal-ov" id="cfgmodal">
+  <div class="modal">
+    <h3>⚙ Konfiguration</h3>
+    <div class="sub">Azure App und Claude API Key – wird nur lokal auf deinem Geraet gespeichert.</div>
+    <div class="minfo">Azure: Mail.Read, Mail.ReadWrite, Mail.Send, User.Read ✅<br>Redirect: <span id="redirectUri" style="font-family:monospace;font-size:10px"></span></div>
+    <div class="mf"><label>Azure Client ID</label><input type="text" id="cfg_client_id" placeholder="aa8510ea-..."></div>
+    <div class="mf"><label>Tenant ID</label><input type="text" id="cfg_tenant_id" placeholder="710620de-..."></div>
+    <div class="mf"><label>Claude API Key</label><input type="password" id="cfg_claude_key" placeholder="sk-ant-..."></div>
+    <div class="mfoot">
+      <button class="mb mb-cancel" onclick="closeConfig()">Abbrechen</button>
+      <button class="mb mb-save" onclick="saveConfig()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONSTANTS ──
+var PW='EHC2026', CLAUDE_KEY='', CLIENT_ID='', TENANT_ID='common';
+var M=[], sel=null, accessToken=null, isLoadingAI=false;
+
+var PRIOS=[
+  {key:'pu',label:'Wichtig & Dringend'},
+  {key:'pi',label:'Wichtig'},
+  {key:'pm',label:'Muss gemacht werden'},
+  {key:'pn',label:'Nice to have'},
+  {key:'pf',label:'Nachhalten'}
+];
+var F=['EHC / Eingangsrechnungen','EHC / Vertraege','EHC / Korrespondenz','EHC / Personal','EHC / Finanzen','EHC / OP-Dokumentation','Qodia / Allgemein','Qodia / Investoren','Qodia / Vertraege','Privat / Allgemein','Kein Anhang'];
+
+var FOLDERS=[
+  {id:'inbox',label:'Posteingang',icon:'📥'},
+  {id:'ehc',label:'EHC',icon:'🏥',children:[
+    {id:'ehc-rech',label:'Eingangsrechnungen',icon:'🧾'},
+    {id:'ehc-vert',label:'Vertraege',icon:'📄'},
+    {id:'ehc-korr',label:'Korrespondenz',icon:'✉'},
+    {id:'ehc-pers',label:'Personal',icon:'👤'},
+    {id:'ehc-fin',label:'Finanzen',icon:'💰'},
+    {id:'ehc-op',label:'OP-Dokumentation',icon:'🔬'},
+    {id:'ehc-hosp',label:'Hospitationen',icon:'🏨'},
+  ]},
+  {id:'qodia',label:'Qodia',icon:'🚀',children:[
+    {id:'qod-allg',label:'Allgemein',icon:'📁'},
+    {id:'qod-inv',label:'Investoren',icon:'📊'},
+    {id:'qod-vert',label:'Vertraege',icon:'📄'},
+  ]},
+  {id:'priv',label:'Privat',icon:'🔒',children:[
+    {id:'priv-allg',label:'Allgemein',icon:'📁'},
+  ]},
+  {id:'news',label:'Newsletter',icon:'📰'},
+  {id:'sent',label:'Gesendet',icon:'📤'},
+];
+
+// ── PANEL WIDTHS ──
+var DEF={p_folders:200,p_list:260,p_ki:400};
+function loadW(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('ki_w')||'{}'));}catch(e){return DEF;}}
+function saveW(){
+  var w={};
+  ['p-folders','p-list','p-ki'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&!el.classList.contains('collapsed'))w[id.replace('-','_')]=el.offsetWidth;
+  });
+  localStorage.setItem('ki_w',JSON.stringify(w));
+}
+function loadC(){try{return JSON.parse(localStorage.getItem('ki_c')||'{}');}catch(e){return {};}}
+function saveC(){
+  var c={};
+  ['p-folders','p-list','p-body','p-ki'].forEach(function(id){c[id]=document.getElementById(id).classList.contains('collapsed');});
+  localStorage.setItem('ki_c',JSON.stringify(c));
+}
+function applyLayout(){
+  var w=loadW(),c=loadC();
+  // Panels mit gespeicherter Breite
+  [['p-folders','p_folders'],['p-list','p_list'],['p-ki','p_ki']].forEach(function(pair){
+    var el=document.getElementById(pair[0]);
+    if(c[pair[0]]){el.classList.add('collapsed');}
+    else{el.style.width=(w[pair[1]]||DEF[pair[1]])+'px';}
+  });
+  if(c['p-body'])document.getElementById('p-body').classList.add('collapsed');
+  updateCollapseButtons();
+}
+
+// ── RESIZE ──
+function initResize(){
+  document.querySelectorAll('.rh').forEach(function(handle){
+    var panelId=handle.dataset.panel;
+    var dir=handle.dataset.dir; // 'right' = panel is left of handle, 'left' = panel is right of handle
+    var dragging=false,startX=0,startW=0;
+    handle.addEventListener('mousedown',function(e){
+      var panel=document.getElementById(panelId);
+      if(panel.classList.contains('collapsed'))return;
+      dragging=true;startX=e.clientX;startW=panel.offsetWidth;
+      handle.classList.add('active');
+      document.body.style.cursor='col-resize';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove',function(e){
+      if(!dragging)return;
+      var panel=document.getElementById(panelId);
+      var delta=(dir==='left')?(startX-e.clientX):(e.clientX-startX);
+      var newW=Math.max(80,startW+delta); // Minimum 80px
+      panel.style.width=newW+'px';
+    });
+    document.addEventListener('mouseup',function(){
+      if(!dragging)return;
+      dragging=false;
+      handle.classList.remove('active');
+      document.body.style.cursor='';
+      saveW();
+    });
+  });
+}
+
+// ── COLLAPSE ──
+function handleHeaderClick(id,e){
+  // Nur klappen wenn auf Header selbst geklickt (nicht auf Button)
+  var panel=document.getElementById(id);
+  var wasCollapsed=panel.classList.contains('collapsed');
+  if(!wasCollapsed&&e.target.classList.contains('panel-header'))return; // Nicht zuklappen wenn man auf Header klickt (nur aufklappen)
+  togglePanel(id);
+}
+function togglePanel(id){
+  var el=document.getElementById(id);
+  var isCollapsed=el.classList.toggle('collapsed');
+  if(!isCollapsed){
+    var w=loadW();
+    var key=id.replace('-','_');
+    el.style.width=(w[key]||DEF[key]||200)+'px';
+  }
+  updateCollapseButtons();
+  saveC();
+}
+function updateCollapseButtons(){
+  ['p-folders','p-list','p-body','p-ki'].forEach(function(id){
+    var el=document.getElementById(id);
+    var btn=el.querySelector('.collapse-btn');
+    if(!btn)return;
+    var isRight=(id==='p-ki');
+    var isCollapsed=el.classList.contains('collapsed');
+    btn.textContent=isCollapsed?(isRight?'‹':'›'):(isRight?'›':'‹');
+  });
+}
+
+// ── ORDNER-SIDEBAR: echte Outlook-Ordner laden ──
+var outlookFolderMap = {}; // name -> id mapping fuer Verschieben
+
+async function loadOutlookFolders() {
+  if(!accessToken) { renderFoldersStatic(); return; }
+  try {
+    var res = await fetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=50&$select=id,displayName,unreadItemCount,childFolderCount', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    if(!res.ok) { renderFoldersStatic(); return; }
+    var data = await res.json();
+    var topFolders = data.value || [];
+    outlookFolderMap = {};
+    topFolders.forEach(function(f){ outlookFolderMap[f.displayName] = f.id; });
+
+    // Unterordner fuer Ordner mit Kindern laden
+    var html = '';
+    for(var i=0; i<topFolders.length; i++) {
+      var f = topFolders[i];
+      var icon = getFolderIcon(f.displayName);
+      var badge = f.unreadItemCount > 0 ? '<span class="fi-cnt">'+f.unreadItemCount+'</span>' : '';
+      if(f.childFolderCount > 0) {
+        // Unterordner laden
+        var subRes = await fetch('https://graph.microsoft.com/v1.0/me/mailFolders/'+f.id+'/childFolders?$top=50&$select=id,displayName,unreadItemCount', {
+          headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        if(subRes.ok) {
+          var subData = await subRes.json();
+          var children = subData.value || [];
+          children.forEach(function(c){ outlookFolderMap[f.displayName+'/'+c.displayName] = c.id; outlookFolderMap[c.displayName] = c.id; });
+          html += '<div class="fg open">'
+            +'<div class="fg-head" onclick="this.parentElement.classList.toggle(\'open\')">'
+              +'<span class="fg-arrow">▶</span><span>'+icon+' '+escHtml(f.displayName)+'</span>'+badge
+            +'</div>'
+            +'<div class="fg-items">'
+              +children.map(function(c){
+                var cb = c.unreadItemCount>0?'<span class="fi-cnt">'+c.unreadItemCount+'</span>':'';
+                return '<div class="fi" data-folderid="'+c.id+'" onclick="filterByOutlookFolder(\''+c.id+'\',\''+escHtml(c.displayName)+'\',this)">'
+                  +'<span>📁</span><span>'+escHtml(c.displayName)+'</span>'+cb+'</div>';
+              }).join('')
+            +'</div></div>';
+        }
+      } else {
+        html += '<div class="fi" style="padding-left:10px" data-folderid="'+f.id+'" onclick="filterByOutlookFolder(\''+f.id+'\',\''+escHtml(f.displayName)+'\',this)">'
+          +'<span>'+icon+'</span><span>'+escHtml(f.displayName)+'</span>'+badge+'</div>';
+      }
+    }
+    document.getElementById('folder-list').innerHTML = html;
+  } catch(e) { renderFoldersStatic(); }
+}
+
+function getFolderIcon(name) {
+  var n = name.toLowerCase();
+  if(n.includes('posteingang')||n.includes('inbox')) return '📥';
+  if(n.includes('gesendet')||n.includes('sent')) return '📤';
+  if(n.includes('entwurf')||n.includes('draft')) return '📝';
+  if(n.includes('gelöscht')||n.includes('deleted')||n.includes('trash')) return '🗑️';
+  if(n.includes('junk')||n.includes('spam')) return '🚫';
+  if(n.includes('ehc')||n.includes('hernie')) return '🏥';
+  if(n.includes('qodia')) return '🚀';
+  if(n.includes('rechnung')||n.includes('invoice')) return '🧾';
+  if(n.includes('personal')) return '👤';
+  if(n.includes('vertrag')) return '📄';
+  if(n.includes('newsletter')) return '📰';
+  return '📁';
+}
+
+async function filterByOutlookFolder(folderId, folderName, el) {
+  document.querySelectorAll('.fi').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+  if(!accessToken) { toast('Nicht verbunden','#f87171'); return; }
+  // Mails aus diesem Ordner laden
+  document.getElementById('badge').textContent = 'Lade...';
+  try {
+    var res = await fetch('https://graph.microsoft.com/v1.0/me/mailFolders/'+folderId+'/messages?$top=30&$select=id,subject,from,receivedDateTime,bodyPreview,isRead,importance,body,hasAttachments&$orderby=receivedDateTime desc', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var data = await res.json();
+    M = (data.value||[]).map(function(m,i) { return buildMailObj(m); });
+    sel = null; rs(); rd(); rp();
+    if(M.length>0) pick(0);
+    document.getElementById('badge').textContent = M.length + ' Mails';
+    toast(folderName + ': ' + M.length + ' Mails');
+    analyzeMailsWithClaude();
+  } catch(e) { toast('Fehler: '+e.message,'#f87171'); }
+}
+
+function buildMailObj(m) {
+  var from = m.from&&m.from.emailAddress ? m.from.emailAddress : {};
+  var org = (from.name||from.address||'Unbekannt').replace(/[^a-zA-Z0-9]/g,'_');
+  var bodyHtml='', bodyText='';
+  if(m.body){
+    if(m.body.contentType==='html'){bodyHtml=m.body.content.replace(/<script[^>]*>.*?<\/script>/gsi,'');bodyText=m.body.content.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();}
+    else{bodyText=m.body.content||'';bodyHtml='<pre style="white-space:pre-wrap;font-family:inherit">'+escHtml(bodyText)+'</pre>';}
+  } else {bodyText=m.bodyPreview||'';bodyHtml='<p>'+escHtml(bodyText)+'</p>';}
+  var atts = m.hasAttachments ? [{name:'Anhang',filename:makeFilename({org:org},'Anhang.pdf'),ordner:'EHC / Korrespondenz'}] : [];
+  var pattern = getRecurringPattern(from.address||'?');
+  return {
+    id:m.id, from:from.address||'?', fromName:from.name||from.address||'?', org:org,
+    subj:m.subject||'(kein Betreff)', t:fmtDate(m.receivedDateTime),
+    prio:pattern?pattern.lastPrio:'pm', pl:pattern?pattern.lastPl:'Analysiere...', plOrig:pattern?pattern.lastPrio:'pm',
+    ak:'', bg:'', at:'', atOrig:'',
+    mailOrdner:pattern?pattern.lastMailOrdner:'EHC / Korrespondenz', mailOrdnerOrig:'',
+    attachments:atts, tasks:[], noReply:false,
+    fbKorrekt:null, fb:'', d:false, isRead:m.isRead,
+    recurring:!!pattern, recurringInterval:pattern?pattern.interval:'monthly',
+    bodyText:bodyText.slice(0,3000), bodyHtml:bodyHtml, bodyPreview:m.bodyPreview||''
+  };
+}
+
+function renderFoldersStatic() {
+  var html='';
+  FOLDERS.forEach(function(f){
+    if(f.children){
+      html+='<div class="fg open"><div class="fg-head" onclick="this.parentElement.classList.toggle(\'open\')"><span class="fg-arrow">▶</span><span>'+f.icon+' '+f.label+'</span></div><div class="fg-items">'+
+        f.children.map(function(c){return '<div class="fi" onclick="filterFolder(\''+c.id+'\',this)"><span>'+c.icon+'</span><span>'+c.label+'</span></div>';}).join('')+
+      '</div></div>';
+    }else{
+      html+='<div class="fi" style="padding-left:10px" onclick="filterFolder(\''+f.id+'\',this)"><span>'+f.icon+'</span><span>'+f.label+'</span></div>';
+    }
+  });
+  document.getElementById('folder-list').innerHTML=html;
+}
+function filterFolder(id,el){
+  document.querySelectorAll('.fi').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+}
+
+// ── UTILS ──
+function ds(){var d=new Date();return String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(s,c){var t=document.getElementById('toast');t.textContent=s;t.style.color=c||'#5eead4';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2800);}
+function fmtDate(s){if(!s)return'';var d=new Date(s),n=new Date(),diff=n-d,od=86400000;if(diff<od&&d.getDate()===n.getDate())return d.toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'});if(diff<2*od)return'Gestern';if(diff<7*od)return['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()];return d.toLocaleDateString('de',{day:'2-digit',month:'2-digit'});}
+function prioLabel(k){var p=PRIOS.find(function(x){return x.key===k;});return p?p.label:k;}
+function makeFilename(m,attachName){
+  var org=m.org||'Unbekannt';
+  var ext=attachName?attachName.split('.').pop():'pdf';
+  var base=attachName?attachName.split('.').slice(0,-1).join('.'):'Datei';
+  return ds()+'_'+org+'_'+base+'.'+ext;
+}
+function ordnerSel(val,id){
+  return '<select class="ablegen-sel" id="'+id+'">'+F.map(function(x){return'<option'+(x===val?' selected':'')+'>'+x+'</option>';}).join('')+'</select>';
+}
+
+// ── CONFIG ──
+function loadConfig(){CLIENT_ID=localStorage.getItem('ki_client_id')||'';TENANT_ID=localStorage.getItem('ki_tenant_id')||'common';CLAUDE_KEY=localStorage.getItem('ki_claude_key')||'';}
+function saveConfig(){
+  var cid=document.getElementById('cfg_client_id').value.trim();
+  var tid=document.getElementById('cfg_tenant_id').value.trim()||'common';
+  var ck=document.getElementById('cfg_claude_key').value.trim();
+  if(!cid){toast('Client ID fehlt!','#f87171');return;}
+  if(!ck){toast('Claude Key fehlt!','#f87171');return;}
+  CLIENT_ID=cid;TENANT_ID=tid;CLAUDE_KEY=ck;
+  localStorage.setItem('ki_client_id',cid);localStorage.setItem('ki_tenant_id',tid);localStorage.setItem('ki_claude_key',ck);
+  document.getElementById('cfgmodal').style.display='none';toast('Gespeichert ✓');
+}
+function openConfig(){document.getElementById('cfg_client_id').value=CLIENT_ID;document.getElementById('cfg_tenant_id').value=TENANT_ID;document.getElementById('cfg_claude_key').value=CLAUDE_KEY;document.getElementById('cfgmodal').style.display='flex';}
+function closeConfig(){document.getElementById('cfgmodal').style.display='none';}
+
+// ── AUTH ──
+function login(){var pw=document.getElementById('pw').value;if(pw===PW){sessionStorage.setItem('ki','1');document.getElementById('loginpage').style.display='none';document.getElementById('mainpage').style.display='flex';init();}else{document.getElementById('err').style.display='block';document.getElementById('pw').value='';}}
+function logout(){sessionStorage.removeItem('ki');sessionStorage.removeItem('ms_token');accessToken=null;location.reload();}
+function connectMicrosoft(){if(!CLIENT_ID){openConfig();toast('Bitte Client ID eintragen','#f87171');return;}var ru=window.location.origin+window.location.pathname;var sc=encodeURIComponent('https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/User.Read');window.location.href='https://login.microsoftonline.com/'+TENANT_ID+'/oauth2/v2.0/authorize?client_id='+CLIENT_ID+'&response_type=token&redirect_uri='+encodeURIComponent(ru)+'&scope='+sc+'&response_mode=fragment';}
+function disconnectMicrosoft(){accessToken=null;sessionStorage.removeItem('ms_token');M=[];sel=null;updateMsBtn(false);rs();rd();rp();toast('Getrennt');}
+function parseOAuthHash(){var h=window.location.hash;if(h&&h.includes('access_token=')){var p={};h.slice(1).split('&').forEach(function(x){var kv=x.split('=');p[kv[0]]=decodeURIComponent(kv[1]||'');});if(p.access_token){sessionStorage.setItem('ms_token',p.access_token);sessionStorage.setItem('ki','1');window.history.replaceState({},document.title,window.location.pathname);}}}
+function checkToken(){var t=sessionStorage.getItem('ms_token');if(t){accessToken=t;updateMsBtn(true);return true;}return false;}
+function updateMsBtn(c){document.getElementById('msftbtn').style.display=c?'none':'inline-block';document.getElementById('msftdisc').style.display=c?'inline-block':'none';}
+
+// ── GRAPH ──
+async function loadMailsFromGraph(){
+  if(!accessToken){toast('Nicht verbunden','#f87171');return;}
+  document.getElementById('badge').textContent='Lade...';
+  try{
+    var res=await fetch('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=30&$select=id,subject,from,receivedDateTime,bodyPreview,isRead,importance,body,hasAttachments&$orderby=receivedDateTime desc',{headers:{'Authorization':'Bearer '+accessToken}});
+    if(res.status===401){accessToken=null;sessionStorage.removeItem('ms_token');updateMsBtn(false);toast('Session abgelaufen','#f87171');return;}
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var data=await res.json();
+    M=(data.value||[]).map(function(m){ return buildMailObj(m); });
+    rs();if(M.length>0)pick(0);
+    document.getElementById('badge').textContent=M.length+' Mails';
+    toast(M.length+' Mails geladen ✓');
+    // Outlook-Ordner + OneDrive-Ordner laden
+    loadOneDriveFolders();
+    analyzeMailsWithClaude();
+  }catch(e){toast('Fehler: '+e.message,'#f87171');document.getElementById('badge').textContent='Fehler';}
+}
+
+async function markAsRead(id){if(!accessToken)return;try{await fetch('https://graph.microsoft.com/v1.0/me/messages/'+id,{method:'PATCH',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({isRead:true})});}catch(e){}}
+
+// ── MAIL VERSCHIEBEN (echt) ──
+async function moveMailToFolder(idx) {
+  var m = M[idx]; if(!m) return;
+  saveState();
+  if(!accessToken) { toast('Nicht verbunden','#f87171'); return; }
+  // Ordner-ID aus dem Map holen, oder Ordner per Name suchen
+  var targetName = m.mailOrdner;
+  var folderId = outlookFolderMap[targetName] || outlookFolderMap[targetName.split('/').pop()];
+  if(!folderId) {
+    // Versuche Ordner-ID direkt von Graph zu holen
+    try {
+      var r = await fetch('https://graph.microsoft.com/v1.0/me/mailFolders?$filter=displayName eq \''+encodeURIComponent(targetName.split('/').pop())+'\'', {
+        headers: {'Authorization':'Bearer '+accessToken}
+      });
+      var d = await r.json();
+      if(d.value && d.value.length) folderId = d.value[0].id;
+    } catch(e){}
+  }
+  if(!folderId) { toast('Ordner "'+targetName+'" nicht gefunden','#f87171'); return; }
+  try {
+    var res = await fetch('https://graph.microsoft.com/v1.0/me/messages/'+m.id+'/move', {
+      method: 'POST',
+      headers: {'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},
+      body: JSON.stringify({destinationId: folderId})
+    });
+    if(res.ok) { toast('Mail verschoben → '+targetName+' ✓'); }
+    else { var err=await res.json(); toast('Fehler: '+(err.error?err.error.message:res.status),'#f87171'); }
+  } catch(e) { toast('Fehler: '+e.message,'#f87171'); }
+}
+
+// ── ONEDRIVE: Ordner laden ──
+var oneDriveFolderMap = {}; // path -> driveItem id
+
+async function loadOneDriveFolders() {
+  if(!accessToken) return;
+  try {
+    // Root-Ordner laden
+    var res = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,folder&$top=50', {
+      headers: {'Authorization':'Bearer '+accessToken}
+    });
+    if(!res.ok) return;
+    var data = await res.json();
+    var items = (data.value||[]).filter(function(i){ return i.folder; });
+
+    // Dropdown-Optionen aktualisieren
+    var newF = [];
+    for(var i=0; i<items.length; i++) {
+      var item = items[i];
+      newF.push(item.name);
+      oneDriveFolderMap[item.name] = item.id;
+      // Unterordner laden
+      var subRes = await fetch('https://graph.microsoft.com/v1.0/me/drive/items/'+item.id+'/children?$select=id,name,folder&$top=50', {
+        headers: {'Authorization':'Bearer '+accessToken}
+      });
+      if(subRes.ok) {
+        var subData = await subRes.json();
+        (subData.value||[]).filter(function(x){return x.folder;}).forEach(function(sub){
+          var path = item.name+' / '+sub.name;
+          newF.push(path);
+          oneDriveFolderMap[path] = sub.id;
+          oneDriveFolderMap[sub.name] = sub.id;
+        });
+      }
+    }
+    if(newF.length > 0) {
+      // Globale F-Liste mit echten OneDrive-Ordnern aktualisieren
+      F = newF;
+      // Falls aktuelle Mail gezeigt wird: Dropdown neu rendern
+      if(sel !== null) rp();
+      toast('OneDrive-Ordner geladen ✓');
+    }
+  } catch(e) { console.warn('OneDrive Ordner:', e); }
+}
+
+// ── ONEDRIVE: Anhang ablegen (echt) ──
+async function saveAttachToOneDrive(mailIdx, attIdx) {
+  saveState();
+  var m = M[mailIdx]; if(!m || !m.attachments[attIdx]) return;
+  var a = m.attachments[attIdx];
+  if(!accessToken) { toast('Nicht verbunden','#f87171'); return; }
+
+  // Ordner-ID ermitteln
+  var ordnerName = a.ordner;
+  var folderId = oneDriveFolderMap[ordnerName] || oneDriveFolderMap[ordnerName.split(' / ').pop()];
+
+  toast('Lade Anhang herunter...', '#7dd3fc');
+
+  try {
+    // Schritt 1: Anhang-Daten von Graph holen
+    var attRes = await fetch('https://graph.microsoft.com/v1.0/me/messages/'+m.id+'/attachments?$filter=name eq \''+encodeURIComponent(a.name)+'\'', {
+      headers: {'Authorization':'Bearer '+accessToken}
+    });
+    var attData = await attRes.json();
+    var attachment = attData.value && attData.value[0];
+    if(!attachment) {
+      // Alle Anhänge laden und ersten nehmen
+      var allAtts = await fetch('https://graph.microsoft.com/v1.0/me/messages/'+m.id+'/attachments', {
+        headers: {'Authorization':'Bearer '+accessToken}
+      });
+      var allData = await allAtts.json();
+      attachment = allData.value && allData.value[attIdx];
+    }
+    if(!attachment || !attachment.contentBytes) { toast('Anhang nicht gefunden','#f87171'); return; }
+
+    // Schritt 2: In OneDrive hochladen
+    var uploadUrl;
+    if(folderId) {
+      uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/items/'+folderId+':/'+encodeURIComponent(a.filename)+':/content';
+    } else {
+      // Fallback: Root
+      uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/root:/'+encodeURIComponent(a.filename)+':/content';
+    }
+
+    // Base64 -> Binary
+    var binary = atob(attachment.contentBytes);
+    var bytes = new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    var blob = new Blob([bytes], {type: attachment.contentType||'application/octet-stream'});
+
+    var uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {'Authorization':'Bearer '+accessToken, 'Content-Type': attachment.contentType||'application/octet-stream'},
+      body: blob
+    });
+
+    if(uploadRes.ok) {
+      toast('"'+a.filename+'" → OneDrive/'+ordnerName+' ✓');
+    } else {
+      var err = await uploadRes.json();
+      toast('Upload Fehler: '+(err.error?err.error.message:uploadRes.status),'#f87171');
+    }
+  } catch(e) { toast('Fehler: '+e.message,'#f87171'); }
+}
+
+// ── KI ANALYSE ──
+async function analyzeMailsWithClaude(){
+  if(!CLAUDE_KEY||M.length===0)return;
+  var learnings=getLearnings();
+  var previews=M.slice(0,15).map(function(m,i){return'['+i+'] Von: '+m.fromName+'\nBetreff: '+m.subj+'\nVorschau: '+m.bodyPreview.slice(0,200);}).join('\n\n');
+  var prioMap={'Wichtig & Dringend':'pu','Wichtig':'pi','Muss gemacht werden':'pm','Nice to have':'pn','Nachhalten':'pf'};
+  try{
+    var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:'Du bist KI-Assistent fuer Ole Reinpold, GF Elbe Hernien Centrum (EHC) Hamburg und Qodia GmbH.\nAnalysiere diese E-Mails. Antworte NUR mit JSON-Array.\n\n[{"index":0,"prio":"Wichtig & Dringend|Wichtig|Muss gemacht werden|Nice to have|Nachhalten","aktion":"Was konkret tun (1 Satz)","begruendung":"Warum diese Prioritaet","aufgaben":["Aufgabe"],"mail_ordner":"EHC / Eingangsrechnungen|EHC / Vertraege|EHC / Korrespondenz|EHC / Personal|EHC / Finanzen|EHC / OP-Dokumentation|Qodia / Allgemein|Qodia / Investoren|Qodia / Vertraege|Privat / Allgemein","onedrive_ordner":"gleiche Optionen","keine_antwort_noetig":false}]\n\nREGELN fuer aufgaben (sehr wichtig):\n- Nur Aufgaben die UEBER das Beantworten der Mail hinausgehen (z.B. Rechnung bezahlen, Portal aufrufen, Termin buchen)\n- KEINE Teilschritte: nicht "Betrag pruefen" + "Zahlung anweisen" sondern nur "Rechnung bezahlen"\n- KEINE Ablage-Aufgaben wie "Beleg ablegen" oder "Dokument speichern" - das macht das System automatisch\n- Maximal 3 Aufgaben, nur wenn wirklich noetig\n- Leeres Array [] wenn nichts weiter zu tun ausser antworten\nREGEL keine_antwort_noetig: true bei Rechnungen, Newslettern, reinen Infomails.\n'+learnings+'\n\nE-Mails:\n'+previews}]})}); 
+    var d=await res.json();
+    var text=(d.content&&d.content[0])?d.content[0].text:'[]';
+    var cats=JSON.parse(text.replace(/```json|```/g,'').trim());
+    cats.forEach(function(c){
+      var m=M[c.index];if(!m)return;
+      m.pl=c.prio||'Muss gemacht werden';m.prio=prioMap[m.pl]||'pm';m.plOrig=m.prio;
+      m.ak=c.aktion||'';m.bg=c.begruendung||'';
+      m.mailOrdner=c.mail_ordner||'EHC / Korrespondenz';m.mailOrdnerOrig=m.mailOrdner;
+      // Aufgaben aus KI
+      if(c.aufgaben && c.aufgaben.length) {
+        m.tasks = c.aufgaben.map(function(t){ return {text:t, done:false}; });
+      }
+      // Keine Antwort nötig
+      if(c.keine_antwort_noetig) m.noReply = true;
+      if(m.attachments&&m.attachments.length&&c.onedrive_ordner)m.attachments.forEach(function(a){a.ordner=c.onedrive_ordner;});
+    });
+    rs();if(sel!==null){rd();rp();}toast('KI-Analyse fertig ✓');
+  }catch(e){console.warn('KI:',e);}
+}
+
+// ── KI ANTWORT ──
+async function generateReply(idx){
+  var m=M[idx];if(!m||!CLAUDE_KEY||isLoadingAI)return;
+  isLoadingAI=true;
+  var ta=document.getElementById('reply-ta');
+  var btn=document.getElementById('reply-btn');
+  if(btn){btn.textContent='Schreibt...';btn.disabled=true;}
+  if(ta){ta.value='';ta.placeholder='KI schreibt Antwort...';}
+  try{
+    var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:'Schreibe eine professionelle, kurze deutsche Antwort.\nUnterschrift: "Mit freundlichen Gruessen\nOle Reinpold\nElbe Hernien Centrum Hamburg"\nDirekt beginnen.\n\nVon: '+m.fromName+' <'+m.from+'>\nBetreff: '+m.subj+'\n\n'+(m.bodyText||m.bodyPreview)}]})});
+    var d=await res.json();var reply=(d.content&&d.content[0])?d.content[0].text:'';
+    m.at=reply;m.atOrig='';
+    if(ta){ta.value=reply;ta.placeholder='';}toast('Antwort generiert ✓');
+  }catch(e){toast('Fehler: '+e.message,'#f87171');}
+  finally{isLoadingAI=false;if(btn){btn.textContent='✦ KI Antwort';btn.disabled=false;}}
+}
+
+async function sendReply(idx){
+  var m=M[idx];if(!m||!accessToken){toast('Nicht verbunden','#f87171');return;}
+  saveState();if(!m.at.trim()){toast('Antwort ist leer','#f87171');return;}
+  try{var res=await fetch('https://graph.microsoft.com/v1.0/me/messages/'+m.id+'/reply',{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({comment:m.at})});if(res.ok){toast('Gesendet ✓');m.isRead=true;learnFromEdits(idx);}else{var err=await res.json();toast('Fehler: '+(err.error?err.error.message:res.status),'#f87171');}}catch(e){toast('Fehler: '+e.message,'#f87171');}
+}
+function openInOutlook(idx){var m=M[idx];if(!m)return;saveState();window.open('mailto:'+m.from+'?subject='+encodeURIComponent('AW: '+m.subj)+'&body='+encodeURIComponent(m.at),'_self');}
+
+// ── LERNEN ──
+function learnFromEdits(idx){
+  var m=M[idx];if(!m)return;
+  var edits=[];
+  if(m.prio!==m.plOrig)edits.push('Prio: '+prioLabel(m.plOrig)+' → '+prioLabel(m.prio));
+  if(m.mailOrdner!==m.mailOrdnerOrig&&m.mailOrdnerOrig)edits.push('Ordner: '+m.mailOrdnerOrig+' → '+m.mailOrdner);
+  if(m.at&&m.atOrig!==undefined&&m.at!==m.atOrig&&m.atOrig!=='')edits.push('Antwort angepasst');
+  if(m.fb)edits.push('Feedback: '+m.fb.slice(0,100));
+  if(edits.length>0){var log=JSON.parse(localStorage.getItem('ki_learnings')||'[]');log.push({ts:new Date().toISOString(),subj:m.subj,from:m.from,edits:edits});if(log.length>50)log=log.slice(-50);localStorage.setItem('ki_learnings',JSON.stringify(log));}
+}
+function getLearnings(){try{var log=JSON.parse(localStorage.getItem('ki_learnings')||'[]');if(log.length===0)return'';return'\n\nLerne aus Oles bisherigen Korrekturen (passe deine Vorschlaege entsprechend an):\n'+log.slice(-8).map(function(l){return'- '+l.edits.join(', ');}).join('\n');}catch(e){return'';}}
+
+// ── COLLAPSIBLE KI SECTION ──
+function toggleKiSec(id) {
+  var sec = document.getElementById(id);
+  if(!sec) return;
+  var isCollapsed = sec.classList.toggle('collapsed');
+  var body = sec.querySelector('.ki-sec-body');
+  if(body) body.style.maxHeight = isCollapsed ? '0' : (body.scrollHeight + 200) + 'px';
+}
+
+// ── TODO / AUFGABEN ──
+function addTodo(idx) {
+  var input = document.getElementById('todo-new-input');
+  if(!input || !input.value.trim()) return;
+  var m = M[idx]; if(!m) return;
+  if(!m.tasks) m.tasks = [];
+  m.tasks.push({ text: input.value.trim(), done: false });
+  input.value = '';
+  rp();
+  setTimeout(function(){ var i=document.getElementById('todo-new-input'); if(i)i.focus(); }, 50);
+}
+function toggleTodo(idx, taskIdx) {
+  var m = M[idx]; if(!m || !m.tasks) return;
+  m.tasks[taskIdx].done = !m.tasks[taskIdx].done;
+  var item = document.getElementById('todo-'+taskIdx);
+  if(item) item.classList.toggle('done-task', m.tasks[taskIdx].done);
+}
+function deleteTodo(idx, taskIdx) {
+  var m = M[idx]; if(!m || !m.tasks) return;
+  m.tasks.splice(taskIdx, 1);
+  rp();
+}
+
+// ── KEINE ANTWORT ──
+function toggleNoReply(idx) {
+  var m = M[idx]; if(!m) return;
+  m.noReply = !m.noReply;
+  if(m.noReply) m.at = '';
+  rp();
+}
+
+// ── STATE SPEICHERN ──
+function saveState(){
+  if(sel===null||!M[sel])return;
+  var m=M[sel];
+  var ta=document.getElementById('reply-ta');
+  var fb=document.getElementById('fb-text');
+  var ms=document.getElementById('mail-ord-sel');
+  if(ta)m.at=ta.value;
+  if(fb)m.fb=fb.value;
+  if(ms)m.mailOrdner=ms.value;
+  if(m.attachments)m.attachments.forEach(function(a,i){var as=document.getElementById('att-sel-'+i);var an=document.getElementById('att-name-'+i);if(as)a.ordner=as.value;if(an)a.filename=an.value;});
+}
+
+// ── PRIO ──
+function setPrio(idx,key){
+  var m=M[idx];if(!m)return;
+  m.prio=key;m.pl=prioLabel(key);
+  document.querySelectorAll('.po').forEach(function(b){b.classList.toggle('sel',b.dataset.key===key);});
+  var badge=document.querySelector('.mr.active .pb');
+  if(badge){badge.className='pb '+key;badge.textContent=m.pl;}
+}
+
+// ── FEEDBACK ──
+function setFeedback(val){
+  var yes=document.getElementById('fb-yes'),no=document.getElementById('fb-no'),det=document.getElementById('fb-detail');
+  if(val==='yes'){yes.classList.add('sel');no.classList.remove('sel');det.style.display='none';if(sel!==null&&M[sel])M[sel].fbKorrekt=true;}
+  else{no.classList.add('sel');yes.classList.remove('sel');det.style.display='block';if(sel!==null&&M[sel])M[sel].fbKorrekt=false;}
+}
+
+// ── RENDER: LISTE ──
+function rs(){
+  var p=M.filter(function(m){return!m.d;}).length;
+  document.getElementById('badge').textContent=p+' ausstehend';
+  document.getElementById('sc').textContent=M.length;
+  document.getElementById('slist').innerHTML=M.map(function(m,idx){
+    return'<div class="mr'+(m.d?' done':'')+(sel===idx?' active':'')+(!m.isRead?' unread':'')+'" onclick="pick('+idx+')">'
+      +'<div class="mt"><span class="pb '+m.prio+'">'+escHtml(m.pl)+'</span><span class="mtime">'+m.t+'</span></div>'
+      +'<div class="msubj">'+escHtml(m.subj)+'</div>'
+      +'<div class="mfrom">'+escHtml(m.fromName)+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+// ── RENDER: MAIL-INHALT ──
+function rd(){
+  var mb=document.getElementById('mailbody');
+  if(sel===null||!M[sel]){mb.innerHTML='<div class="empty"><span>✉</span><p>E-Mail auswaehlen</p></div>';return;}
+  var m=M[sel];
+  var attsHtml='';
+  if(m.attachments&&m.attachments.length){
+    attsHtml='<div class="mail-atts">'+m.attachments.map(function(a){return'<div class="att-chip"><span>📎</span>'+escHtml(a.name)+'</div>';}).join('')+'</div>';
+  }
+  mb.innerHTML=
+    '<div class="mail-top">'
+      +'<div class="mail-subj">'+escHtml(m.subj)+'</div>'
+      +'<div class="mail-meta"><span class="mail-from-txt"><strong>'+escHtml(m.fromName)+'</strong> &lt;'+escHtml(m.from)+'&gt;</span><span class="mail-dt">'+m.t+'</span></div>'
+      +attsHtml
+    +'</div>'
+    +'<div class="mail-html" id="mail-html">'+( m.bodyHtml||'<p style="color:#333">Kein Inhalt</p>')+'</div>';
+}
+
+// ── RENDER: KI-PANEL ──
+function rp(){
+  var panel=document.getElementById('kipanel');
+  if(sel===null||!M[sel]){panel.innerHTML='<div class="empty"><span style="font-size:24px">✦</span><p>E-Mail auswaehlen</p></div>';return;}
+  var m=M[sel],idx=sel;
+
+  // 1. PRIORITÄT
+  var s1='<div class="ki-sec"><div class="ki-sec-title">Prioritaet</div>'
+    +'<div class="prio-row">'+PRIOS.map(function(p){return'<div class="po po-'+p.key+(m.prio===p.key?' sel':'')+'" data-key="'+p.key+'" onclick="setPrio('+idx+',\''+p.key+'\')">'+p.label+'</div>';}).join('')+'</div></div>';
+
+  // 2. ANALYSE (einklappbar)
+  var s2='<div class="ki-sec ki-sec-collapsible collapsed" id="ki-analyse-sec">'
+    +'<div class="ki-sec-header" onclick="toggleKiSec(\'ki-analyse-sec\')">'
+      +'<div class="ki-sec-title" style="margin:0">KI-Analyse</div>'
+      +'<span class="ki-toggle-arrow">▶</span>'
+    +'</div>'
+    +'<div class="ki-sec-body" style="max-height:0">'
+      +'<div style="height:8px"></div>'
+      +'<div class="ki-card"><b>EMPFOHLENE AKTION</b>'+escHtml(m.ak||'–')+'</div>'
+      +'<div class="ki-card dark"><b>BEGRUENDUNG</b>'+escHtml(m.bg||'–')+'</div>'
+    +'</div>'
+  +'</div>';
+
+  // 2b. AUFGABEN (aus "weitere Schritte")
+  var tasks = m.tasks || [];
+  var s2b='<div class="ki-sec">'
+    +'<div class="ki-sec-title">Aufgaben nach dieser Mail</div>'
+    +'<div class="todo-hint">Von KI vorgeschlagen – bearbeite, ergaenze oder loesche</div>'
+    +'<div class="todo-list" id="todo-list">'
+      +tasks.map(function(t,i){
+        return '<div class="todo-item'+(t.done?' done-task':'')+'" id="todo-'+i+'">'
+          +'<input type="checkbox"'+(t.done?' checked':'')+' onchange="toggleTodo('+idx+','+i+')">'
+          +'<span class="todo-text">'+escHtml(t.text)+'</span>'
+          +'<button class="todo-del" onclick="deleteTodo('+idx+','+i+')" title="Loeschen">×</button>'
+        +'</div>';
+      }).join('')
+    +'</div>'
+    +'<div class="todo-add-row">'
+      +'<input class="todo-add-input" id="todo-new-input" placeholder="Neue Aufgabe hinzufuegen..." onkeydown="if(event.key===\'Enter\')addTodo('+idx+')">'
+      +'<button class="todo-add-btn" onclick="addTodo('+idx+')">+ Hinzufuegen</button>'
+    +'</div>'
+  +'</div>';
+  // 3. ABLEGEN (Mail + Anhänge kombiniert)
+  var s3='<div class="ki-sec"><div class="ki-sec-title">Ablegen</div><div class="ablegen-section">';
+  // Mail verschieben
+  s3+='<div class="ablegen-row">'
+    +'<div class="ablegen-icon">✉</div>'
+    +'<div class="ablegen-info">'
+      +'<div class="ablegen-label">MAIL VERSCHIEBEN NACH <span class="new-folder-toggle" onclick="toggleNewFolder(\'mail-new-folder-row\')" title="Neuen Unterordner erstellen">+ Neuer Ordner</span></div>'
+      +ordnerSel(m.mailOrdner,'mail-ord-sel')
+      +'<div class="new-folder-row" id="mail-new-folder-row" style="display:none">'
+        +'<input class="new-folder-input" id="mail-new-folder-input" placeholder="Neuer Unterordner z.B. 2026-03 Maerz">'
+        +'<button class="new-folder-btn" onclick="createNewFolder(\'mail-ord-sel\',\'mail-new-folder-input\',\'mail-new-folder-row\')">✓ Erstellen</button>'
+      +'</div>'
+    +'</div>'
+    +'</div>';
+  // Anhänge
+  if(m.attachments&&m.attachments.length){
+    m.attachments.forEach(function(a,i){
+      s3+='<div class="ablegen-row">'
+        +'<div class="ablegen-icon">📎</div>'
+        +'<div class="ablegen-info">'
+          +'<div class="ablegen-label">DATEINAME (editierbar)</div>'
+          +'<input class="ablegen-name-input" id="att-name-'+i+'" value="'+escHtml(a.filename||makeFilename(m,a.name))+'">'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+            +ordnerSel(a.ordner,'att-sel-'+i)
+            +'<span class="new-folder-toggle" onclick="toggleNewFolder(\'att-new-'+i+'\')" title="Neuen Unterordner">+</span>'
+          +'</div>'
+          +'<div class="new-folder-row" id="att-new-'+i+'" style="display:none">'
+            +'<input class="new-folder-input" id="att-new-input-'+i+'" placeholder="z.B. 2026-03 Maerz">'
+            +'<button class="new-folder-btn" onclick="createNewFolder(\'att-sel-'+i+'\',\'att-new-input-'+i+'\',\'att-new-'+i+'\')">✓</button>'
+          +'</div>'
+        +'</div>'
+        +'</div>';
+    });
+  }
+  s3+='</div></div>';
+
+  // 4. ANTWORT
+  var noReply = m.noReply || false;
+  var s4='<div class="ki-sec">'
+    // Toggle-Zeile: Antwort Ja/Nein
+    +'<div class="reply-top">'
+      +'<div class="ki-sec-title" style="margin:0">Antwort</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:11px;color:'+(noReply?'#6b7280':'#c9a96e')+'">'+( noReply?'Keine Antwort':'Antwort noetig')+'</span>'
+        +'<div class="toggle'+(noReply?'':' on')+' " id="reply-toggle" onclick="toggleNoReply('+idx+')" style="cursor:pointer" title="Umschalten"></div>'
+      +'</div>'
+    +'</div>'
+    // Inhalt: je nach Toggle
+    +(noReply
+      ? '<div class="no-reply-note">Kein Antwort wird gesendet – Toggle oben zum Aendern</div>'
+        +'<div style="margin-top:8px"><button class="ki-gen-btn" style="opacity:0.5" onclick="toggleNoReply('+idx+')">Doch Antwort generieren</button></div>'
+      : ('<button class="ki-gen-btn" id="reply-btn" onclick="generateReply('+idx+')" style="margin-bottom:7px">✦ KI Antwort generieren</button>'
+        +'<textarea id="reply-ta" rows="7" placeholder="Antwort eingeben oder KI generieren lassen...">'+escHtml(m.at)+'</textarea>'
+        +'<div class="reply-btns">'
+          +(accessToken?'<button class="btn b-send" onclick="sendReply('+idx+')">✉ Senden</button>':'<button class="btn b-send" onclick="openInOutlook('+idx+')">In Outlook</button>')
+          +'<button class="btn b-draft" onclick="saveState();toast(\'Entwurf gespeichert ✓\')">Entwurf</button>'
+        +'</div>')
+    )
+    +'</div>';
+
+  // 5. WIEDERKEHRENDE MAIL
+  var s5='<div class="ki-sec"><div class="ki-sec-title">Wiederkehrende Mail</div>'
+    +'<div class="recurring-row" onclick="toggleRecurring('+idx+')" id="recurring-row">'
+      +'<div class="toggle'+(m.recurring?' on':'')+'" id="recurring-toggle"></div>'
+      +'<span class="recurring-label">'+(m.recurring?'Diese Mail kommt regelmaessig wieder':'Als wiederkehrend markieren')+'</span>'
+    +'</div>'
+    +'<select class="recurring-interval'+(m.recurring?' show':'')+'" id="recurring-interval" onchange="setRecurringInterval('+idx+',this.value)">'
+      +'<option value="monthly"'+(m.recurringInterval==='monthly'?' selected':'')+'>Monatlich</option>'
+      +'<option value="weekly"'+(m.recurringInterval==='weekly'?' selected':'')+'>Woechentlich</option>'
+      +'<option value="quarterly"'+(m.recurringInterval==='quarterly'?' selected':'')+'>Quartalsweise</option>'
+      +'<option value="yearly"'+(m.recurringInterval==='yearly'?' selected':'')+'>Jaehrlich</option>'
+    +'</select>'
+    +(m.recurring?'<div style="font-size:10px;color:#555;margin-top:6px;line-height:1.5">✓ KI merkt sich alle Einstellungen und wendet sie naechste Mal automatisch an.</div>':'')
+    +'</div>';
+
+  // 6. FEEDBACK
+  var s6='<div class="ki-sec"><div class="ki-sec-title">Feedback fuer KI-Training</div>'
+    +'<div class="fb-row">'
+      +'<div class="fb-btn fb-yes'+(m.fbKorrekt===true?' sel':'')+'" id="fb-yes" onclick="setFeedback(\'yes\')">✓ Alles 100% korrekt</div>'
+      +'<div class="fb-btn fb-no'+(m.fbKorrekt===false?' sel':'')+'" id="fb-no" onclick="setFeedback(\'no\')">✗ Nicht korrekt</div>'
+    +'</div>'
+    +'<div id="fb-detail" style="'+(m.fbKorrekt===false?'':'display:none')+'">'
+      +'<textarea id="fb-text" rows="3" placeholder="Was war falsch? Was soll die KI beim naechsten Mal anders machen? (Prio, Ordner, Antwort...)">'+escHtml(m.fb)+'</textarea>'
+    +'</div></div>';
+
+  // 7. BESTÄTIGEN (alles auf einmal)
+  var willSend = m.at && m.at.trim();
+  var willMove = m.mailOrdner;
+  var willAttach = m.attachments && m.attachments.length;
+  var actionList = [];
+  if(willMove) actionList.push('Mail → '+m.mailOrdner);
+  if(willAttach) actionList.push(m.attachments.length+' Anhang/-haenge in OneDrive');
+  if(willSend) actionList.push('Antwort senden');
+  actionList.push('KI lernt aus Einstellungen');
+
+  var s7='<div style="margin-top:2px">'
+    +'<button class="b-confirm-all" onclick="confirmAll('+idx+')">✓ Alles bestaetigen & ausfuehren</button>'
+    +'<div class="confirm-info">Fuehrt aus: '+actionList.join(' &nbsp;·&nbsp; ')+'</div>'
+    +'</div>'
+    +'<div style="margin-top:8px">'
+    +'<button class="btn b-skip" style="width:100%;text-align:center" onclick="skip('+idx+')">Ueberspringen → Naechste Mail</button>'
+    +'</div>';
+
+  panel.innerHTML=s1+s2+s2b+s3+s4+s5+s6+s7;
+}
+
+// ── INTERAKTIONEN ──
+// ── CONFIRM ALL (ein Klick macht alles) ──
+async function confirmAll(idx) {
+  saveState();
+  var m = M[idx]; if(!m) return;
+
+  // Status-Anzeige
+  var btn = document.querySelector('.b-confirm-all');
+  if(btn){ btn.textContent = 'Wird ausgefuehrt...'; btn.disabled = true; }
+
+  var done = [];
+
+  // 1. Mail als bearbeitet markieren
+  m.d = true;
+
+  // 2. Mail verschieben (echt)
+  if(accessToken && m.mailOrdner) {
+    await moveMailToFolder(idx);
+    done.push('Mail → '+m.mailOrdner);
+  }
+
+  // 3. Anhänge in OneDrive ablegen (echt)
+  if(m.attachments && m.attachments.length) {
+    for(var i=0; i<m.attachments.length; i++) {
+      await saveAttachToOneDrive(idx, i);
+      done.push(m.attachments[i].filename+' → OneDrive');
+    }
+  }
+
+  // 4. Antwort senden (wenn vorhanden und verbunden)
+  if(m.at && m.at.trim()) {
+    if(accessToken) {
+      try {
+        var res = await fetch('https://graph.microsoft.com/v1.0/me/messages/'+m.id+'/reply', {
+          method:'POST', headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},
+          body: JSON.stringify({comment: m.at})
+        });
+        if(res.ok) done.push('Antwort gesendet ✓');
+        else done.push('Antwort (Senden fehlgeschlagen)');
+      } catch(e){ done.push('Antwort konnte nicht gesendet werden'); }
+    } else {
+      done.push('Antwort bereit (Microsoft verbinden zum Senden)');
+    }
+  }
+
+  // 5. Wiederkehrend merken
+  if(m.recurring) {
+    saveRecurringPattern(m);
+    done.push('Muster gespeichert ('+m.recurringInterval+')');
+  }
+
+  // 6. KI lernt
+  learnFromEdits(idx);
+  done.push('KI-Lernlog aktualisiert');
+
+  // Naechste Mail
+  var n = M.findIndex(function(m,i){ return i>idx && !m.d; });
+  if(n===-1) n = M.findIndex(function(m){ return !m.d; });
+  sel = n >= 0 ? n : null;
+  rs(); rd(); rp();
+
+  toast('Ausgefuehrt ✓ ('+done.length+' Aktionen)');
+}
+
+// ── WIEDERKEHRENDE MAILS ──
+function toggleRecurring(idx) {
+  var m = M[idx]; if(!m) return;
+  m.recurring = !m.recurring;
+  if(!m.recurringInterval) m.recurringInterval = 'monthly';
+  // Toggle visuell
+  var t = document.getElementById('recurring-toggle');
+  var lbl = t ? t.nextElementSibling : null;
+  var interval = document.getElementById('recurring-interval');
+  if(t) t.classList.toggle('on', m.recurring);
+  if(lbl) lbl.textContent = m.recurring ? 'Diese Mail kommt regelmaessig wieder' : 'Als wiederkehrend markieren';
+  if(interval) interval.classList.toggle('show', m.recurring);
+}
+function setRecurringInterval(idx, val) {
+  if(M[idx]) M[idx].recurringInterval = val;
+}
+function saveRecurringPattern(m) {
+  var patterns = JSON.parse(localStorage.getItem('ki_recurring') || '[]');
+  // Altes Pattern vom gleichen Absender ersetzen
+  patterns = patterns.filter(function(p){ return p.from !== m.from; });
+  patterns.push({
+    from: m.from, fromName: m.fromName, org: m.org,
+    interval: m.recurringInterval,
+    lastPrio: m.prio, lastPl: m.pl,
+    lastMailOrdner: m.mailOrdner,
+    lastAttachOrdner: m.attachments && m.attachments.length ? m.attachments[0].ordner : null,
+    lastAktion: m.ak,
+    savedAt: new Date().toISOString()
+  });
+  localStorage.setItem('ki_recurring', JSON.stringify(patterns));
+}
+function getRecurringPattern(from) {
+  try {
+    var patterns = JSON.parse(localStorage.getItem('ki_recurring') || '[]');
+    return patterns.find(function(p){ return p.from === from; }) || null;
+  } catch(e){ return null; }
+}
+
+// ── NEUER UNTERORDNER ──
+function toggleNewFolder(rowId) {
+  var row = document.getElementById(rowId);
+  if(!row) return;
+  row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+  if(row.style.display === 'flex') {
+    var input = row.querySelector('.new-folder-input');
+    if(input) input.focus();
+  }
+}
+function createNewFolder(selectId, inputId, rowId) {
+  var sel_el = document.getElementById(selectId);
+  var input = document.getElementById(inputId);
+  var row = document.getElementById(rowId);
+  if(!sel_el || !input || !input.value.trim()) { toast('Bitte Ordnernamen eingeben','#f87171'); return; }
+  var newName = input.value.trim();
+  // Aktuell ausgewaehlten Ordner als Parent
+  var parent = sel_el.value;
+  var fullName = parent !== 'Kein Anhang' ? parent + ' / ' + newName : newName;
+  // Option hinzufuegen und auswaehlen
+  var opt = document.createElement('option');
+  opt.value = fullName; opt.textContent = fullName; opt.selected = true;
+  sel_el.appendChild(opt);
+  // Auch zu globaler F-Liste hinzufuegen
+  if(F.indexOf(fullName) === -1) F.push(fullName);
+  // Zeile ausblenden
+  row.style.display = 'none';
+  input.value = '';
+  toast('Ordner "'+fullName+'" erstellt ✓');
+}
+
+function saveAttach(mailIdx,attIdx){saveAttachToOneDrive(mailIdx,attIdx);}
+
+// ── NAVIGATION ──
+function pick(idx){if(sel!==null)saveState();sel=idx;var m=M[sel];if(m&&!m.isRead){markAsRead(m.id);m.isRead=true;}rs();rd();rp();}
+function skip(idx){saveState();var n=M.findIndex(function(m,i){return i>idx&&!m.d;});if(n===-1)n=M.findIndex(function(m,i){return i<idx&&!m.d;});if(n>=0){sel=n;rs();rd();rp();}}
+function refreshMails(){if(accessToken){M=[];sel=null;rs();rd();rp();loadMailsFromGraph();}else{toast('Bitte Microsoft verbinden','#f87171');}}
+function loadDemoMails(){
+  M=[
+    {id:'d1',from:'rechnungen@helios-kliniken.de',fromName:'Helios Kliniken',org:'Helios_Kliniken',subj:'Rechnung Maerz 2026 – Nr. 2026-0342',t:'09:14',prio:'pu',pl:'Wichtig & Dringend',plOrig:'pu',ak:'Rechnung pruefen und Zahlung anweisen',bg:'Zahlungsfrist 14 Tage laeuft in Kuerze ab',at:'',atOrig:'',mailOrdner:'EHC / Eingangsrechnungen',mailOrdnerOrig:'EHC / Eingangsrechnungen',
+      attachments:[
+        {name:'Rechnung_2026-0342.pdf',filename:'260324_Helios_Kliniken_Rechnung_2026-0342.pdf',ordner:'EHC / Eingangsrechnungen'},
+        {name:'Leistungsnachweis_Maerz.pdf',filename:'260324_Helios_Kliniken_Leistungsnachweis_Maerz.pdf',ordner:'EHC / Eingangsrechnungen'}
+      ],
+      tasks:[
+        {text:'Rechnung bezahlen',done:false}
+      ],
+      noReply:true, recurring:false,recurringInterval:'monthly',
+      fbKorrekt:null,fb:'',d:false,isRead:false,
+      bodyText:'Sehr geehrter Herr Reinpold, anbei Rechnung Nr. 2026-0342 ueber 4.850,00 EUR.',
+      bodyHtml:'<p>Sehr geehrter Herr Reinpold,</p><p>anbei erhalten Sie unsere Rechnung Nr. <strong>2026-0342</strong> ueber <strong>4.850,00 EUR</strong> fuer medizinische Leistungen im Maerz 2026.</p><p><strong>Zahlungsfrist: 14 Tage</strong> ab Rechnungsdatum.</p><p>Mit freundlichen Gruessen<br>Helios Kliniken – Abrechnung</p>',
+      bodyPreview:'Rechnung 2026-0342, 4.850 EUR, Zahlungsfrist 14 Tage'},
+    {id:'d2',from:'k.mueller@praxis-mueller.de',fromName:'Dr. K. Mueller',org:'Praxis_Mueller',subj:'Patientenueberweisung Hernie',t:'10:32',prio:'pi',pl:'Wichtig',plOrig:'pi',ak:'Terminvorschlaege senden',bg:'Kollegin wartet auf Antwort',at:'',atOrig:'',mailOrdner:'EHC / Korrespondenz',mailOrdnerOrig:'EHC / Korrespondenz',
+      attachments:[{name:'Ueberweisung_Mustermann.pdf',filename:'260324_Praxis_Mueller_Ueberweisung_Mustermann.pdf',ordner:'EHC / OP-Dokumentation'}],
+      tasks:[
+        {text:'Termin fuer Mustermann im System anlegen',done:false}
+      ],
+      noReply:false, recurring:false,recurringInterval:'monthly',
+      fbKorrekt:null,fb:'',d:false,isRead:false,
+      bodyText:'Guten Tag, Ueberweisung Mustermann, Leistenhernie rechts. Bitte Terminvorschlag.',
+      bodyHtml:'<p>Guten Tag Herr Reinpold,</p><p>ich ueberweise Ihnen <strong>Max Mustermann</strong> (geb. 15.03.1978) mit einer symptomatischen <strong>Leistenhernie rechts</strong>.</p><p>Koennten Sie mir bitte <strong>zeitnah einen Terminvorschlag</strong> zusenden?</p><p>Mit kollegialen Gruessen<br>Dr. Katharina Mueller</p>',
+      bodyPreview:'Ueberweisung Mustermann, Leistenhernie rechts'},
+    {id:'d3',from:'lasse@qodia.de',fromName:'Lasse / Qodia',org:'Qodia',subj:'Investorengespraech KW13 – Update',t:'Gestern',prio:'pf',pl:'Nachhalten',plOrig:'pf',ak:'Q1-Zahlen bis Dienstag senden',bg:'Investor moechte Report vor Entscheidung',at:'Hi Lasse,\n\ntop, freut mich. Die Q1-Zahlen schicke ich dir bis Dienstag.\nDonnerstag 14:00 passt.\n\nOle',atOrig:'',mailOrdner:'Qodia / Investoren',mailOrdnerOrig:'Qodia / Investoren',attachments:[],
+      tasks:[
+        {text:'Q1-Zahlen bis Dienstag an Lasse senden',done:false},
+        {text:'Donnerstag 14:00 Call in Kalender eintragen',done:false}
+      ],
+      noReply:false, recurring:false,recurringInterval:'monthly',
+      fbKorrekt:null,fb:'',d:false,isRead:true,
+      bodyText:'Hi Ole, Investor interessiert, moechte Q1-Report. Donnerstag Call?',
+      bodyHtml:'<p>Hi Ole,</p><p>kurzes Update: Das Gespraech mit dem Investor lief <strong>sehr gut</strong>. Er ist definitiv interessiert, moechte aber den <strong>Q1-Report</strong> sehen.</p><p>Kannst du mir die Zahlen <strong>bis Dienstag</strong> schicken? Und passt dir <strong>Donnerstag 14 Uhr</strong>?</p><p>LG Lasse</p>',
+      bodyPreview:'Investor interessiert, Q1-Report angefordert'},
+    {id:'d4',from:'info@steuerberater-franke.de',fromName:'StB Franke',org:'Steuerberater_Franke',subj:'2. Erinnerung: Unterlagen Jahresabschluss 2025',t:'Mo',prio:'pm',pl:'Muss gemacht werden',plOrig:'pm',ak:'Unterlagen zusammenstellen und senden',bg:'Zweite Erinnerung – Frist laeuft',at:'',atOrig:'',mailOrdner:'EHC / Finanzen',mailOrdnerOrig:'EHC / Finanzen',attachments:[],
+      tasks:[
+        {text:'Kontoauszuege Q3+Q4 und Belege zusammenstellen',done:false},
+        {text:'Unterlagen an StB Franke senden',done:false}
+      ],
+      noReply:false, recurring:true,recurringInterval:'monthly',
+      fbKorrekt:null,fb:'',d:false,isRead:true,
+      bodyText:'2. Erinnerung Jahresabschluss 2025. Bitte Unterlagen bis Ende der Woche.',
+      bodyHtml:'<p>Sehr geehrter Herr Reinpold,</p><p>dies ist unsere <strong>zweite Erinnerung</strong> bezueglich der Unterlagen fuer den <strong>Jahresabschluss 2025</strong>.</p><p>Benoetigt: Kontoauszuege Q3+Q4, Belege >500 EUR, Inventarliste 31.12.2025</p><p><strong>Bitte bis Ende der Woche.</strong></p>',
+      bodyPreview:'2. Erinnerung Jahresabschluss 2025, Frist Ende Woche'},
+  ];
+}
+
+// ── INIT ──
+function init(){
+  loadConfig();applyLayout();initResize();
+  renderFoldersStatic(); // erstmal statisch zeigen
+  if(checkToken()){
+    loadMailsFromGraph();
+    loadOutlookFolders(); // echte Ordner nachladen
+  }else{
+    loadDemoMails();rs();pick(0);
+  }
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  loadConfig();parseOAuthHash();
+  document.getElementById('redirectUri').textContent=window.location.origin+window.location.pathname;
+  if(sessionStorage.getItem('ki')==='1'){document.getElementById('loginpage').style.display='none';document.getElementById('mainpage').style.display='flex';init();}
+});
+</script>
+</body>
+</html>
