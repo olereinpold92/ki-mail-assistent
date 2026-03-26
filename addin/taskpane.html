@@ -34,6 +34,12 @@
     .prio-btn[data-p="m"].active { background: #fbc02d; color: #333; }
     .prio-btn[data-p="nth"].active { background: #66bb6a; }
     .prio-btn[data-p="na"].active { background: #42a5f5; }
+    .prio-btn[data-a="sofort"].active { background: #d32f2f; }
+    .prio-btn[data-a="todo_wichtig"].active { background: #f57c00; }
+    .prio-btn[data-a="todo_nth"].active { background: #fbc02d; color: #333; }
+    .prio-btn[data-a="nachhalten"].active { background: #42a5f5; }
+    .prio-btn[data-a="ablage"].active { background: #66bb6a; }
+    .prio-btn[data-a="loeschen"].active { background: #999; }
 
     /* Folder select */
     select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
@@ -149,16 +155,17 @@
     <button class="btn btn-outline btn-sm" id="btn-reanalyze-top" onclick="startAnalysis(true)" style="display:none">Neu</button>
   </div>
 
-  <!-- Priority -->
-  <div class="section" id="sec-prio">
-    <div class="section-head" onclick="toggleSection('sec-prio')">Prioritaet <span class="arrow">▼</span></div>
+  <!-- Aktion (was soll mit der Mail passieren) -->
+  <div class="section" id="sec-aktion">
+    <div class="section-head" onclick="toggleSection('sec-aktion')">Aktion <span class="arrow">▼</span></div>
     <div class="section-body">
-      <div class="prio-row" id="prio-row">
-        <button class="prio-btn" data-p="wd" onclick="setPrio(this)">Wichtig & Dringend</button>
-        <button class="prio-btn" data-p="w" onclick="setPrio(this)">Wichtig</button>
-        <button class="prio-btn" data-p="m" onclick="setPrio(this)">Muss gemacht werden</button>
-        <button class="prio-btn" data-p="nth" onclick="setPrio(this)">Nice to have</button>
-        <button class="prio-btn" data-p="na" onclick="setPrio(this)">Nachhalten</button>
+      <div class="prio-row" id="aktion-row">
+        <button class="prio-btn" data-a="sofort" onclick="setAktion(this)">Sofort</button>
+        <button class="prio-btn" data-a="todo_wichtig" onclick="setAktion(this)">ToDo Wichtig</button>
+        <button class="prio-btn" data-a="todo_nth" onclick="setAktion(this)">ToDo NTH</button>
+        <button class="prio-btn" data-a="nachhalten" onclick="setAktion(this)">Nachhalten</button>
+        <button class="prio-btn" data-a="ablage" onclick="setAktion(this)">Ablage</button>
+        <button class="prio-btn" data-a="loeschen" onclick="setAktion(this)">Loeschen</button>
       </div>
     </div>
   </div>
@@ -677,6 +684,7 @@ function resetUIForNewMail() {
 
   // UI zuruecksetzen
   document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('folder-select').selectedIndex = 0;
   document.getElementById('reply-toggle').checked = false;
   document.getElementById('reply-label').textContent = 'Keine Antwort noetig';
@@ -930,7 +938,7 @@ async function analyzeEmail() {
 
   var heute = new Date().toISOString().slice(0,10).replace(/-/g,'').slice(2); // JJMMTT
 
-  var prompt = 'Du bist der persoenliche KI-Mail-Assistent von Ole Reinpold. Analysiere die folgende E-Mail.\n\n'
+  var prompt = 'Du bist der persoenliche KI-Mail-Assistent von Ole Reinpold (Prokurist, Elbe Hernien Centrum EHC GmbH, Hamburg). Analysiere die folgende E-Mail.\n\n'
     + context
     + '=== E-MAIL ===\n'
     + 'Von: ' + state.from + ' <' + state.fromEmail + '>\n'
@@ -938,12 +946,20 @@ async function analyzeEmail() {
     + 'Anhaenge:\n' + attInfo + '\n'
     + 'Heutiges Datum fuer Dateinamen: ' + heute + '\n\n'
     + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
+    + '=== AKTIONS-SYSTEM ===\n'
+    + 'Waehle GENAU EINE Aktion fuer diese Mail:\n'
+    + '- "sofort": Muss Ole sofort erledigen, bleibt im Posteingang\n'
+    + '- "todo_wichtig": Wichtige Aufgabe, kommt in 01_ToDo/01_Wichtig\n'
+    + '- "todo_nth": Nice-to-have, kommt in 01_ToDo/02_NTH\n'
+    + '- "nachhalten": Warten auf Rueckmeldung / spaeter pruefen, kommt in 02_Nachhalten\n'
+    + '- "ablage": Erledigt oder reine Info, wird im passenden Firmen-/Themenordner abgelegt\n'
+    + '- "loeschen": Spam, irrelevant, Newsletter die Ole nicht braucht\n\n'
     + '=== AUFGABE ===\n'
     + 'Antworte NUR als JSON (kein Markdown, kein Text drumherum):\n'
     + '{\n'
-    + '  "prioritaet": "wd|w|m|nth|na",\n'
+    + '  "aktion": "sofort|todo_wichtig|todo_nth|nachhalten|ablage|loeschen",\n'
     + '  "analyse": "2-3 Saetze: Worum geht es, was wird erwartet",\n'
-    + '  "ordner": "Genauer Ordnername aus der Ordner-Liste",\n'
+    + '  "ordner": "Genauer Ziel-Ordnername (bei ablage: z.B. Firmen & Organisationen / Hafenklinik. Bei todo/nachhalten/loeschen: wird automatisch gesetzt)",\n'
     + '  "antwort_noetig": true/false,\n'
     + '  "antwort_entwurf": "Antwort-Text in Oles Stil (oder leer wenn nicht noetig)",\n'
     + '  "aufgaben": ["Aufgabe 1", "Aufgabe 2"] (max 3, NUR was ueber Antworten+Ablegen hinausgeht),\n'
@@ -1001,21 +1017,52 @@ function applyAnalysis(a) {
   // Analyse-Text
   document.getElementById('analysis-text').textContent = a.analyse || 'Keine Analyse';
 
-  // Prioritaet
-  if (a.prioritaet) {
-    state.prio = a.prioritaet;
-    document.querySelectorAll('.prio-btn').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.p === a.prioritaet);
-    });
+  // Aktion (neues System) – bestimmt automatisch den Ziel-Ordner
+  var aktionOrdnerMap = {
+    'sofort': null,  // bleibt im Posteingang
+    'todo_wichtig': '01_ToDo/01_Wichtig',
+    'todo_nth': '01_ToDo/02_NTH',
+    'nachhalten': '02_Nachhalten',
+    'loeschen': null  // wird geloescht
+  };
+
+  state.aktion = a.aktion || '';
+
+  // Ordner setzen: bei ablage nimmt die KI den passenden Ordner, sonst automatisch
+  var zielOrdner = a.ordner || '';
+  if (a.aktion && a.aktion !== 'ablage' && aktionOrdnerMap[a.aktion] !== undefined) {
+    zielOrdner = aktionOrdnerMap[a.aktion] || '';
   }
 
-  // Ordner
-  if (a.ordner) {
-    state.folder = a.ordner;
+  // Altes prioritaet-Feld auch noch unterstuetzen (Rueckwaerts-Kompatibilitaet Cache)
+  if (!a.aktion && a.prioritaet) {
+    state.prio = a.prioritaet;
+  }
+
+  // Ordner im Dropdown auswaehlen
+  if (zielOrdner) {
+    state.folder = zielOrdner;
     var sel = document.getElementById('folder-select');
+    var found = false;
     for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === a.ordner) { sel.selectedIndex = i; break; }
+      var optText = sel.options[i].textContent || '';
+      if (sel.options[i].value === zielOrdner || optText.indexOf(zielOrdner) !== -1 || zielOrdner.indexOf(optText.trim()) !== -1) {
+        sel.selectedIndex = i;
+        found = true;
+        break;
+      }
     }
+    if (!found && a.ordner) {
+      // Fallback: KI-Vorschlag als Text anzeigen
+      state.folder = a.ordner;
+    }
+  }
+
+  // Aktions-Button aktivieren
+  if (a.aktion) {
+    document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.a === a.aktion);
+    });
   }
 
   // Antwort
@@ -1061,6 +1108,28 @@ function setPrio(btn) {
   document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   state.prio = btn.dataset.p;
+}
+
+function setAktion(btn) {
+  document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  state.aktion = btn.dataset.a;
+  // Ordner automatisch setzen
+  var aktionOrdnerMap = {
+    'todo_wichtig': '01_ToDo/01_Wichtig',
+    'todo_nth': '01_ToDo/02_NTH',
+    'nachhalten': '02_Nachhalten'
+  };
+  if (aktionOrdnerMap[state.aktion]) {
+    var sel = document.getElementById('folder-select');
+    var ziel = aktionOrdnerMap[state.aktion];
+    for (var i = 0; i < sel.options.length; i++) {
+      if ((sel.options[i].textContent || '').indexOf(ziel) !== -1) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+  }
 }
 
 function onReplyToggle() {
