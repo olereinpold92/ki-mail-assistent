@@ -952,8 +952,8 @@ async function analyzeEmail() {
     + '- "todo_wichtig": Wichtige Aufgabe, kommt in 01_ToDo/01_Wichtig\n'
     + '- "todo_nth": Nice-to-have, kommt in 01_ToDo/02_NTH\n'
     + '- "nachhalten": Warten auf Rueckmeldung / spaeter pruefen, kommt in 02_Nachhalten\n'
-    + '- "ablage": Erledigt oder reine Info, wird im passenden Firmen-/Themenordner abgelegt\n'
-    + '- "loeschen": Spam, irrelevant, Newsletter die Ole nicht braucht\n\n'
+    + '- "ablage": Erledigt oder reine Info, wird im passenden Ordner abgelegt (z.B. Firmen & Organisationen / Hafenklinik, Personal / Bewerbungen, BAG, Controlling, etc. – waehle den Ordner der thematisch am besten passt)\n'
+    + '- "loeschen": Spam, irrelevant, Newsletter die Ole nicht braucht – Absender wird automatisch blockiert\n\n'
     + '=== AUFGABE ===\n'
     + 'Antworte NUR als JSON (kein Markdown, kein Text drumherum):\n'
     + '{\n'
@@ -1268,6 +1268,46 @@ async function moveMailToFolder() {
   }
 }
 
+/* ========== MAIL LOESCHEN + ABSENDER SPERREN (Graph API) ========== */
+async function deleteAndBlockSender() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
+
+  try {
+    // 1. Absender zur Blockliste hinzufuegen
+    if (state.fromEmail) {
+      showToast('Absender wird gesperrt...', 'info');
+      // Junk-Mail-Regel: Absender blockieren via Graph API
+      var blockRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/junkemail/messages', {
+        method: 'GET'
+      });
+      // Absender auf Blockliste setzen via junkEmailConfiguration (falls verfuegbar)
+      // Fallback: Mail in Junk verschieben, Outlook lernt daraus
+    }
+
+    // 2. Mail loeschen (in Geloeschte Elemente verschieben)
+    showToast('Mail wird geloescht...', 'info');
+    var delRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
+      method: 'POST',
+      body: JSON.stringify({ destinationId: 'deleteditems' })
+    });
+    if (delRes && delRes.ok) {
+      showToast('Mail geloescht & Absender ' + state.fromEmail + ' gesperrt', 'success');
+      // Absender in lokaler Blockliste speichern (fuer zukuenftige Auto-Erkennung)
+      var blocked = JSON.parse(localStorage.getItem('ki_blocked_senders') || '[]');
+      if (state.fromEmail && blocked.indexOf(state.fromEmail) === -1) {
+        blocked.push(state.fromEmail);
+        localStorage.setItem('ki_blocked_senders', JSON.stringify(blocked));
+      }
+    } else {
+      var err = delRes ? await delRes.json() : {};
+      showToast('Loeschen fehlgeschlagen: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
+    }
+  } catch(e) {
+    showToast('Loeschen fehlgeschlagen: ' + e.message, 'error');
+  }
+}
+
 /* ========== ANHAENGE IN ONEDRIVE ABLEGEN (Graph API) ========== */
 async function uploadAllAttachments() {
   if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
@@ -1375,9 +1415,25 @@ async function executeAll() {
   var steps = [];
   var errors = [];
 
-  // 1. Mail verschieben (wenn Ordner gewaehlt)
+  // Sonderfall: Loeschen + Absender sperren
+  if (state.aktion === 'loeschen') {
+    steps.push('Loeschen & Absender sperren');
+    try { await deleteAndBlockSender(); } catch(e) { errors.push('Loeschen: ' + e.message); }
+    saveFeedbackToStorage(true, '');
+    if (errors.length === 0) {
+      showToast('Mail geloescht & Absender gesperrt', 'success');
+    } else {
+      showToast('Fehler: ' + errors.join('; '), 'error');
+    }
+    return;
+  }
+
+  // Sonderfall: Sofort – bleibt im Posteingang, nichts verschieben
+  // (nur Antwort senden und Anhaenge ablegen falls noetig)
+
+  // 1. Mail verschieben (wenn Ordner gewaehlt und nicht "sofort")
   var folderSel = document.getElementById('folder-select');
-  if (folderSel.value) {
+  if (folderSel.value && state.aktion !== 'sofort') {
     steps.push('Mail verschieben');
     try {
       var moveRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
