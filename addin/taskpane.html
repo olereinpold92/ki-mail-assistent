@@ -270,6 +270,9 @@
         <input type="text" id="new-task" placeholder="Eigene Aufgabe..." onkeydown="if(event.key==='Enter')addTask()">
         <button class="btn btn-outline btn-sm" onclick="addTask()">+</button>
       </div>
+      <div class="btn-row" id="task-buttons" style="display:none">
+        <button class="btn btn-primary btn-sm" onclick="createTodosInMicrosoft()">In Microsoft To Do erstellen</button>
+      </div>
     </div>
   </div>
 
@@ -339,7 +342,7 @@ var state = {
 var outlookFolderMap = {};   // displayName -> folder ID
 var oneDriveFolderMap = {};  // path -> driveItem ID
 var msalInstance = null;
-var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite'];
+var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite', 'Tasks.ReadWrite'];
 
 /* ========== MSAL AUTH ========== */
 function initMsal() {
@@ -1571,6 +1574,9 @@ function renderTasks() {
       + '<span class="task-text ' + (t.done ? 'done' : '') + '">' + t.text + '</span>';
     list.appendChild(div);
   });
+  // Button zeigen wenn Aufgaben vorhanden
+  var btn = document.getElementById('task-buttons');
+  if (btn) btn.style.display = state.tasks.length > 0 ? 'flex' : 'none';
 }
 
 function toggleTask(i) {
@@ -1585,6 +1591,92 @@ function addTask() {
   state.tasks.push({ text: text, done: false });
   input.value = '';
   renderTasks();
+}
+
+/* ========== MICROSOFT TO DO ========== */
+async function createTodosInMicrosoft() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  var undoneTasks = state.tasks.filter(function(t) { return !t.done; });
+  if (undoneTasks.length === 0) { showToast('Keine offenen Aufgaben', 'info'); return; }
+
+  // Standard To-Do-Liste holen (oder "Aufgaben" erstellen)
+  var listId = await getOrCreateTodoList('Aufgaben');
+  if (!listId) { showToast('To-Do-Liste konnte nicht erstellt werden', 'error'); return; }
+
+  // Mail-Link erstellen (Outlook Web deep link)
+  var mailLink = '';
+  if (state.restMailId) {
+    mailLink = 'https://outlook.office.com/mail/id/' + encodeURIComponent(state.restMailId);
+  }
+
+  var erfolg = 0;
+  for (var i = 0; i < undoneTasks.length; i++) {
+    var t = undoneTasks[i];
+    // Notiz mit Kontext
+    var body = 'Aus Mail: ' + state.subject + '\n'
+      + 'Von: ' + state.from + ' <' + state.fromEmail + '>\n';
+    if (mailLink) body += 'Mail oeffnen: ' + mailLink + '\n';
+    // Anhang-Links hinzufuegen (wenn in OneDrive abgelegt)
+    if (state.attachments.length > 0) {
+      body += '\nAnhaenge:\n';
+      state.attachments.forEach(function(a) {
+        var name = a.suggestedName || a.name;
+        body += '- ' + name + '\n';
+      });
+    }
+
+    try {
+      var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists/' + listId + '/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: t.text,
+          body: { content: body, contentType: 'text' },
+          importance: 'normal',
+          isReminderOn: false
+        })
+      });
+      if (res && res.ok) {
+        erfolg++;
+        t.done = true;
+      }
+    } catch(e) { console.error('To-Do Fehler:', e); }
+  }
+
+  renderTasks();
+  if (erfolg > 0) {
+    showToast(erfolg + ' Aufgabe(n) in Microsoft To Do erstellt', 'success');
+  } else {
+    showToast('Aufgaben konnten nicht erstellt werden', 'error');
+  }
+}
+
+async function getOrCreateTodoList(name) {
+  try {
+    // Bestehende Listen durchsuchen
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
+    if (res && res.ok) {
+      var data = await res.json();
+      var existing = (data.value || []).find(function(l) { return l.displayName === name; });
+      if (existing) return existing.id;
+      // Standard-Liste "Aufgaben" oder "Tasks" nehmen
+      var defaultList = (data.value || []).find(function(l) {
+        return l.displayName === 'Aufgaben' || l.displayName === 'Tasks' || l.displayName === 'Vorgänge';
+      });
+      if (defaultList) return defaultList.id;
+      // Erste Liste als Fallback
+      if (data.value && data.value.length > 0) return data.value[0].id;
+    }
+    // Neue Liste erstellen
+    var createRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists', {
+      method: 'POST',
+      body: JSON.stringify({ displayName: name })
+    });
+    if (createRes && createRes.ok) {
+      var created = await createRes.json();
+      return created.id;
+    }
+  } catch(e) { console.error('To-Do Liste Fehler:', e); }
+  return null;
 }
 
 /* ========== FEEDBACK ========== */
