@@ -35,11 +35,11 @@
     .prio-btn[data-p="nth"].active { background: #66bb6a; }
     .prio-btn[data-p="na"].active { background: #42a5f5; }
     .prio-btn[data-a="sofort"].active { background: #d32f2f; }
-    .prio-btn[data-a="todo_wichtig"].active { background: #f57c00; }
+    .prio-btn[data-a="erledigen"].active { background: #f57c00; }
+    .prio-btn[data-a="todo_wichtig"].active { background: #e65100; }
     .prio-btn[data-a="todo_nth"].active { background: #fbc02d; color: #333; }
     .prio-btn[data-a="nachhalten"].active { background: #42a5f5; }
     .prio-btn[data-a="ablage"].active { background: #66bb6a; }
-    .prio-btn[data-a="loeschen"].active { background: #999; }
 
     /* Folder select */
     select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
@@ -170,17 +170,11 @@
     <div class="section-body">
       <div class="prio-row" id="aktion-row">
         <button class="prio-btn" data-a="sofort" onclick="setAktion(this)">Sofort</button>
+        <button class="prio-btn" data-a="erledigen" onclick="setAktion(this)">Erledigen</button>
         <button class="prio-btn" data-a="todo_wichtig" onclick="setAktion(this)">ToDo Wichtig</button>
         <button class="prio-btn" data-a="todo_nth" onclick="setAktion(this)">ToDo NTH</button>
         <button class="prio-btn" data-a="nachhalten" onclick="setAktion(this)">Nachhalten</button>
         <button class="prio-btn" data-a="ablage" onclick="setAktion(this)">Ablage</button>
-        <button class="prio-btn" data-a="loeschen" onclick="setAktion(this)">Loeschen</button>
-      </div>
-      <div id="block-sender-area" style="display:none; margin-top:8px; padding:6px 8px; background:#fff3cd; border-radius:4px;">
-        <div class="reply-toggle">
-          <label class="toggle"><input type="checkbox" id="block-sender-toggle" onchange="onBlockToggle()"><span class="toggle-slider"></span></label>
-          <span id="block-sender-label" style="font-size:12px;">Domain sperren: <strong id="block-domain"></strong></span>
-        </div>
       </div>
     </div>
   </div>
@@ -210,7 +204,6 @@
       </div>
       <div class="btn-row">
         <button class="btn btn-primary btn-sm" onclick="moveMailToFolder()">Mail verschieben</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMailAndOptionalBlock()">Loeschen</button>
         <button class="btn btn-outline btn-sm" onclick="addNewFolder()">+ Ordner</button>
       </div>
     </div>
@@ -706,7 +699,10 @@ var FOLDER_TREE = [
   { path: 'Rechtliches', children: [] },
   { path: 'Sonstiges', children: [] },
   { path: 'Strategie', children: [] },
-  { path: 'Wolle', children: [] }
+  { path: 'Wolle', children: [] },
+  // System-Ordner zum Loeschen
+  { path: 'Geloeschte Elemente', children: [] },
+  { path: 'Papierkorb', children: [] }
 ];
 
 function buildFolderList() {
@@ -1265,17 +1261,16 @@ async function analyzeEmail() {
     + 'Waehle bei Aktion "ablage" IMMER einen dieser Ordner. Bei ToDo/Nachhalten wird der Ordner automatisch gesetzt.\n\n'
     + '=== AKTIONS-SYSTEM ===\n'
     + 'Waehle GENAU EINE Aktion fuer diese Mail:\n'
-    + '- "sofort": Muss Ole sofort erledigen, bleibt im Posteingang\n'
-    + '- "todo_wichtig": Wichtige Aufgabe, kommt in 01_ToDo/01_Wichtig\n'
-    + '- "todo_nth": Nice-to-have, kommt in 01_ToDo/02_NTH\n'
+    + '- "sofort": Muss Ole JETZT sofort erledigen, bleibt im Posteingang\n'
+    + '- "erledigen": Muss gemacht werden aber nicht sofort, bleibt im Posteingang\n'
+    + '- "todo_wichtig": Wichtige Aufgabe mit Termin/Deadline, kommt in 01_ToDo / 02_Wichtig\n'
+    + '- "todo_nth": Nice-to-have, kommt in 01_ToDo / 04_NTH\n'
     + '- "nachhalten": Warten auf Rueckmeldung / spaeter pruefen, kommt in 02_Nachhalten\n'
-    + '- "ablage": Erledigt oder reine Info, wird im passenden Ordner abgelegt (z.B. Firmen & Organisationen / Hafenklinik, Personal / Bewerbungen, BAG, Controlling, etc. – waehle den Ordner der thematisch am besten passt)\n'
-    + '- "loeschen": Spam, irrelevant, Newsletter die Ole nicht braucht – Absender wird automatisch blockiert\n\n'
+    + '- "ablage": Erledigt oder reine Info, wird im passenden Ordner abgelegt (z.B. Firmen & Organisationen / Hafenklinik, Personal / Bewerbungen, BAG, Controlling, Geloeschte Elemente, Papierkorb etc.)\n\n'
     + '=== AUFGABE ===\n'
     + 'Antworte NUR als JSON (kein Markdown, kein Text drumherum):\n'
     + '{\n'
-    + '  "aktion": "sofort|todo_wichtig|todo_nth|nachhalten|ablage|loeschen",\n'
-    + '  "absender_sperren": true/false (true bei Spam, unerwuenschter Werbung, irrelevanten Newslettern – sperrt die ganze Domain),\n'
+    + '  "aktion": "sofort|erledigen|todo_wichtig|todo_nth|nachhalten|ablage",\n'
     + '  "analyse": "2-3 Saetze: Worum geht es, was wird erwartet",\n'
     + '  "ordner": "Genauer Ziel-Ordnername (bei ablage: z.B. Firmen & Organisationen / Hafenklinik. Bei todo/nachhalten/loeschen: wird automatisch gesetzt)",\n'
     + '  "antwort_noetig": true/false,\n'
@@ -1338,8 +1333,8 @@ function applyAnalysis(a) {
   // Aktion (neues System) – bestimmt automatisch den Ziel-Ordner
   var aktionOrdnerMap = {
     'sofort': null,  // bleibt im Posteingang
-    'todo_wichtig': '01_ToDo/01_Wichtig',
-    'todo_nth': '01_ToDo/02_NTH',
+    'todo_wichtig': '01_ToDo / 02_Wichtig',
+    'todo_nth': '01_ToDo / 04_NTH',
     'nachhalten': '02_Nachhalten',
     'loeschen': null  // wird geloescht
   };
@@ -1436,8 +1431,8 @@ function setAktion(btn) {
   state.aktion = btn.dataset.a;
   // Ordner automatisch setzen
   var aktionOrdnerMap = {
-    'todo_wichtig': '01_ToDo/01_Wichtig',
-    'todo_nth': '01_ToDo/02_NTH',
+    'todo_wichtig': '01_ToDo / 02_Wichtig',
+    'todo_nth': '01_ToDo / 04_NTH',
     'nachhalten': '02_Nachhalten'
   };
   if (aktionOrdnerMap[state.aktion]) {
@@ -1844,25 +1839,9 @@ async function executeAll() {
   var steps = [];
   var errors = [];
 
-  // Sonderfall: Loeschen + Absender sperren
-  if (state.aktion === 'loeschen') {
-    steps.push(state.blockSender ? 'Loeschen & Domain sperren' : 'Loeschen');
-    try { await deleteMailAndOptionalBlock(); } catch(e) { errors.push('Loeschen: ' + e.message); }
-    saveFeedbackToStorage(true, '');
-    if (errors.length === 0) {
-      showToast('Mail geloescht & Absender gesperrt', 'success');
-    } else {
-      showToast('Fehler: ' + errors.join('; '), 'error');
-    }
-    return;
-  }
-
-  // Sonderfall: Sofort – bleibt im Posteingang, nichts verschieben
-  // (nur Antwort senden und Anhaenge ablegen falls noetig)
-
-  // 1. Mail verschieben (wenn Ordner eingegeben und nicht "sofort")
+  // 1. Mail verschieben (wenn Ordner eingegeben und nicht "sofort"/"erledigen")
   var folderName = document.getElementById('folder-input').value.trim();
-  if (folderName && state.aktion !== 'sofort') {
+  if (folderName && state.aktion !== 'sofort' && state.aktion !== 'erledigen') {
     steps.push('Mail verschieben');
     try {
       await moveMailToFolder();
