@@ -5,7 +5,7 @@
            xsi:type="MailApp">
 
   <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
-  <Version>1.0.4</Version>
+  <Version>1.0.5</Version>
   <ProviderName>EHC Hamburg</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="KI Mail Assistent"/>
@@ -20,7 +20,7 @@
 
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.5"/>
+      <Set Name="Mailbox" MinVersion="1.13"/>
     </Sets>
   </Requirements>
 
@@ -43,7 +43,7 @@
 
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
     <Requirements>
-      <bt:Sets DefaultMinVersion="1.5">
+      <bt:Sets DefaultMinVersion="1.13">
         <bt:Set Name="Mailbox"/>
       </bt:Sets>
     </Requirements>
@@ -68,6 +68,7 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="taskpaneUrl"/>
+                    <SupportsNoItemContext>true</SupportsNoItemContext>
                     <SupportsPinning>true</SupportsPinning>
                   </Action>
                 </Control>
