@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KI Mail Assistent</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', -apple-system, sans-serif; background: #f3f3f3; color: #333; font-size: 13px; overflow-y: auto; }
+
+    /* Header */
+    .header { background: #0078d4; color: white; padding: 10px 14px; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+    .header-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .header-btn:hover { background: rgba(255,255,255,0.3); }
+
+    /* Sections */
+    .section { background: white; border-radius: 6px; margin: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+    .section-head { padding: 10px 12px; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+    .section-head:hover { background: #f9f9f9; }
+    .section-head .arrow { transition: transform 0.2s; font-size: 10px; color: #999; }
+    .section.collapsed .section-body { display: none; }
+    .section.collapsed .arrow { transform: rotate(-90deg); }
+    .section-body { padding: 0 12px 12px 12px; }
+
+    /* Priority buttons */
+    .prio-row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .prio-btn { padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; cursor: pointer; background: white; transition: all 0.15s; }
+    .prio-btn:hover { border-color: #0078d4; }
+    .prio-btn.active { color: white; border-color: transparent; }
+    .prio-btn[data-p="wd"].active { background: #d32f2f; }
+    .prio-btn[data-p="w"].active { background: #f57c00; }
+    .prio-btn[data-p="m"].active { background: #fbc02d; color: #333; }
+    .prio-btn[data-p="nth"].active { background: #66bb6a; }
+    .prio-btn[data-p="na"].active { background: #42a5f5; }
+
+    /* Folder select */
+    select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
+
+    /* Attachments */
+    .att-item { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; }
+    .att-item input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
+    .att-item select { flex: 0 0 140px; }
+
+    /* Reply */
+    .reply-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .toggle { position: relative; width: 36px; height: 20px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+    .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: white; border-radius: 50%; transition: 0.2s; }
+    .toggle input:checked + .toggle-slider { background: #0078d4; }
+    .toggle input:checked + .toggle-slider:before { left: 18px; }
+    textarea { width: 100%; min-height: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; }
+
+    /* Tasks */
+    .task-item { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+    .task-item input[type=checkbox] { margin-top: 2px; }
+    .task-text { flex: 1; font-size: 12px; line-height: 1.4; }
+    .task-text.done { text-decoration: line-through; color: #999; }
+    .add-task { display: flex; gap: 4px; margin-top: 6px; }
+    .add-task input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
+
+    /* Buttons */
+    .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; }
+    .btn-primary { background: #0078d4; color: white; }
+    .btn-primary:hover { background: #106ebe; }
+    .btn-success { background: #107c10; color: white; }
+    .btn-success:hover { background: #0b6a0b; }
+    .btn-outline { background: white; border: 1px solid #ddd; color: #555; }
+    .btn-outline:hover { border-color: #0078d4; color: #0078d4; }
+    .btn-danger { background: #d32f2f; color: white; }
+    .btn-danger:hover { background: #b71c1c; }
+    .btn-sm { padding: 3px 8px; font-size: 11px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 6px; margin-top: 8px; }
+
+    /* Feedback */
+    .fb-row { display: flex; gap: 6px; }
+    .fb-row .btn { flex: 1; }
+
+    /* Execute all */
+    .execute-all { margin: 8px; }
+    .execute-all .btn { width: 100%; padding: 12px; font-size: 14px; }
+
+    /* Analysis collapsible */
+    .analysis-text { font-size: 12px; line-height: 1.5; color: #555; white-space: pre-wrap; }
+
+    /* Loading */
+    .loading { display: flex; align-items: center; gap: 8px; padding: 8px 0; color: #666; }
+    .spinner { width: 16px; height: 16px; border: 2px solid #ddd; border-top-color: #0078d4; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Config */
+    .config-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; }
+    .config-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; background: white; z-index: 101; padding: 16px; overflow-y: auto; display: none; }
+    .config-panel h2 { font-size: 16px; margin-bottom: 12px; }
+    .config-panel label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 12px; }
+    .config-panel input[type=text], .config-panel input[type=password] { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+
+    /* Status toast */
+    .toast { position: fixed; bottom: 16px; left: 8px; right: 8px; padding: 10px 14px; border-radius: 6px; color: white; font-size: 12px; z-index: 200; display: none; }
+    .toast.success { background: #107c10; }
+    .toast.error { background: #d32f2f; }
+    .toast.info { background: #0078d4; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <span>KI Mail Assistent</span>
+  <button class="header-btn" onclick="toggleConfig()">Einstellungen</button>
+</div>
+
+<!-- Loading state -->
+<div id="loading-state" class="section" style="margin-top:8px">
+  <div class="section-body" style="padding-top:12px">
+    <div class="loading"><div class="spinner"></div><span id="loading-text">Add-in wird geladen...</span></div>
+  </div>
+</div>
+
+<!-- Main content (hidden until loaded) -->
+<div id="main-content" style="display:none">
+
+  <!-- Priority -->
+  <div class="section" id="sec-prio">
+    <div class="section-head" onclick="toggleSection('sec-prio')">Prioritaet <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="prio-row" id="prio-row">
+        <button class="prio-btn" data-p="wd" onclick="setPrio(this)">Wichtig & Dringend</button>
+        <button class="prio-btn" data-p="w" onclick="setPrio(this)">Wichtig</button>
+        <button class="prio-btn" data-p="m" onclick="setPrio(this)">Muss gemacht werden</button>
+        <button class="prio-btn" data-p="nth" onclick="setPrio(this)">Nice to have</button>
+        <button class="prio-btn" data-p="na" onclick="setPrio(this)">Nachhalten</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analysis (collapsed by default) -->
+  <div class="section collapsed" id="sec-analysis">
+    <div class="section-head" onclick="toggleSection('sec-analysis')">KI-Analyse <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="analysis-text" id="analysis-text">Noch nicht analysiert.</div>
+      <div class="btn-row" id="analysis-buttons">
+        <button class="btn btn-primary btn-sm" id="btn-analyze" onclick="startAnalysis(false)">Jetzt analysieren</button>
+        <button class="btn btn-outline btn-sm" id="btn-reanalyze" onclick="startAnalysis(true)" style="display:none">Neu analysieren</button>
+      </div>
+      <div id="mail-age-warning" style="display:none; margin-top:6px; padding:6px 8px; background:#fff3cd; border-radius:4px; font-size:11px; color:#856404;">
+        Diese Mail ist aelter als heute. Analyse moeglich, aber nur manuell.
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder -->
+  <div class="section" id="sec-folder">
+    <div class="section-head" onclick="toggleSection('sec-folder')">Ordner <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <select id="folder-select"><option value="">Wird geladen...</option></select>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-sm" onclick="moveMailToFolder()">Mail verschieben</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attachments -->
+  <div class="section" id="sec-attachments" style="display:none">
+    <div class="section-head" onclick="toggleSection('sec-attachments')">Anhaenge <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div id="att-list"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-sm" onclick="uploadAllAttachments()">Alle in OneDrive ablegen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reply -->
+  <div class="section" id="sec-reply">
+    <div class="section-head" onclick="toggleSection('sec-reply')">Antwort <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="reply-toggle">
+        <label class="toggle"><input type="checkbox" id="reply-toggle" onchange="onReplyToggle()"><span class="toggle-slider"></span></label>
+        <span id="reply-label">Keine Antwort noetig</span>
+      </div>
+      <div id="reply-area" style="display:none">
+        <textarea id="reply-text" placeholder="Antwort wird generiert..."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-sm" onclick="generateReply()">KI Antwort generieren</button>
+          <button class="btn btn-success btn-sm" onclick="sendReply()">Senden</button>
+          <button class="btn btn-outline btn-sm" onclick="saveDraft()">Entwurf</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasks -->
+  <div class="section" id="sec-tasks">
+    <div class="section-head" onclick="toggleSection('sec-tasks')">Aufgaben <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div id="task-list"></div>
+      <div class="add-task">
+        <input type="text" id="new-task" placeholder="Eigene Aufgabe..." onkeydown="if(event.key==='Enter')addTask()">
+        <button class="btn btn-outline btn-sm" onclick="addTask()">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback -->
+  <div class="section" id="sec-feedback">
+    <div class="section-head" onclick="toggleSection('sec-feedback')">Feedback <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="fb-row">
+        <button class="btn btn-success btn-sm" onclick="sendFeedback(true)">Alles 100% korrekt</button>
+        <button class="btn btn-danger btn-sm" onclick="sendFeedback(false)">Nicht korrekt</button>
+      </div>
+      <div id="fb-detail" style="display:none;margin-top:8px">
+        <textarea id="fb-text" placeholder="Was war falsch? (hilft der KI zu lernen)" style="min-height:60px"></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-sm" onclick="submitFeedback()">Feedback senden</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Execute All -->
+<div class="execute-all" id="execute-all" style="display:none">
+  <button class="btn btn-success" onclick="executeAll()">Alles bestaetigen & ausfuehren</button>
+</div>
+
+<!-- Config Panel -->
+<div class="config-overlay" id="config-overlay" onclick="toggleConfig()"></div>
+<div class="config-panel" id="config-panel">
+  <h2>Einstellungen</h2>
+  <label>Claude API Key</label>
+  <input type="password" id="cfg-claude-key" placeholder="sk-ant-...">
+  <label>Azure Client ID</label>
+  <input type="text" id="cfg-client-id" value="aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0">
+  <label>Azure Tenant ID</label>
+  <input type="text" id="cfg-tenant-id" value="710620de-9a6b-4cca-bf53-99ce2a3e407f">
+  <div class="btn-row" style="margin-top:16px">
+    <button class="btn btn-primary" onclick="saveConfig()">Speichern</button>
+    <button class="btn btn-outline" onclick="toggleConfig()">Abbrechen</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ========== STATE ========== */
+var state = {
+  mailId: null,
+  subject: '',
+  from: '',
+  fromEmail: '',
+  body: '',
+  attachments: [],
+  analysis: null,
+  prio: '',
+  folder: '',
+  replyNeeded: false,
+  replyText: '',
+  tasks: [],
+  graphToken: null
+};
+
+/* ========== GEDAECHTNIS (loaded from server) ========== */
+var gedaechtnis = {
+  profil: '',
+  ordnerRegeln: null,
+  anhangRegeln: null,
+  antwortRegeln: null,
+  feedback: ''
+};
+
+/* ========== INIT ========== */
+Office.onReady(function(info) {
+  if (info.host === Office.HostType.Outlook) {
+    loadConfig();
+    loadGedaechtnis().then(function() {
+      readMailData();
+    });
+  } else {
+    document.getElementById('loading-text').textContent = 'Nicht in Outlook geoeffnet. Bitte Mail in Outlook oeffnen.';
+  }
+});
+
+/* ========== CONFIG ========== */
+function loadConfig() {
+  var key = localStorage.getItem('ki_claude_key') || '';
+  var cid = localStorage.getItem('ki_client_id') || 'aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0';
+  var tid = localStorage.getItem('ki_tenant_id') || '710620de-9a6b-4cca-bf53-99ce2a3e407f';
+  document.getElementById('cfg-claude-key').value = key;
+  document.getElementById('cfg-client-id').value = cid;
+  document.getElementById('cfg-tenant-id').value = tid;
+}
+
+function saveConfig() {
+  localStorage.setItem('ki_claude_key', document.getElementById('cfg-claude-key').value.trim());
+  localStorage.setItem('ki_client_id', document.getElementById('cfg-client-id').value.trim());
+  localStorage.setItem('ki_tenant_id', document.getElementById('cfg-tenant-id').value.trim());
+  toggleConfig();
+  showToast('Einstellungen gespeichert', 'success');
+}
+
+function toggleConfig() {
+  var open = document.getElementById('config-panel').style.display === 'block';
+  document.getElementById('config-panel').style.display = open ? 'none' : 'block';
+  document.getElementById('config-overlay').style.display = open ? 'none' : 'block';
+}
+
+/* ========== GEDAECHTNIS LADEN ========== */
+async function loadGedaechtnis() {
+  try {
+    var base = window.location.origin;
+    var results = await Promise.allSettled([
+      fetch(base + '/gedaechtnis/profil/grundprofil.md').then(r => r.ok ? r.text() : ''),
+      fetch(base + '/gedaechtnis/regeln/ordner.json').then(r => r.ok ? r.json() : null),
+      fetch(base + '/gedaechtnis/regeln/anhaenge.json').then(r => r.ok ? r.json() : null),
+      fetch(base + '/gedaechtnis/regeln/antworten.json').then(r => r.ok ? r.json() : null),
+      fetch(base + '/gedaechtnis/feedback/zusammenfassung.md').then(r => r.ok ? r.text() : '')
+    ]);
+    gedaechtnis.profil = results[0].status === 'fulfilled' ? results[0].value : '';
+    gedaechtnis.ordnerRegeln = results[1].status === 'fulfilled' ? results[1].value : null;
+    gedaechtnis.anhangRegeln = results[2].status === 'fulfilled' ? results[2].value : null;
+    gedaechtnis.antwortRegeln = results[3].status === 'fulfilled' ? results[3].value : null;
+    gedaechtnis.feedback = results[4].status === 'fulfilled' ? results[4].value : '';
+    console.log('Gedaechtnis geladen:', Object.keys(gedaechtnis).map(k => k + '=' + (gedaechtnis[k] ? 'OK' : 'leer')).join(', '));
+  } catch(e) {
+    console.warn('Gedaechtnis laden fehlgeschlagen:', e);
+  }
+}
+
+/* ========== MAIL DATEN LESEN ========== */
+function readMailData() {
+  var item = Office.context.mailbox.item;
+  if (!item) {
+    document.getElementById('loading-text').textContent = 'Keine Mail ausgewaehlt.';
+    return;
+  }
+  state.subject = item.subject || '(kein Betreff)';
+  state.from = item.from ? item.from.displayName : 'Unbekannt';
+  state.fromEmail = item.from ? item.from.emailAddress : '';
+  state.mailId = item.itemId;
+
+  // Anhaenge lesen
+  if (item.attachments && item.attachments.length > 0) {
+    state.attachments = [];
+    for (var i = 0; i < item.attachments.length; i++) {
+      var att = item.attachments[i];
+      if (!att.isInline) {
+        state.attachments.push({ name: att.name, id: att.id, size: att.size, suggestedName: '', suggestedFolder: '' });
+      }
+    }
+  }
+
+  // Mail-Body laden
+  item.body.getAsync(Office.CoercionType.Text, function(result) {
+    if (result.status === Office.AsyncResultStatus.Succeeded) {
+      state.body = result.value;
+      onMailLoaded();
+    } else {
+      state.body = '(Body konnte nicht geladen werden)';
+      onMailLoaded();
+    }
+  });
+}
+
+function onMailLoaded() {
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('execute-all').style.display = 'block';
+
+  // Ordner-Dropdown befuellen
+  populateFolderDropdown();
+
+  // Anhaenge anzeigen
+  if (state.attachments.length > 0) {
+    document.getElementById('sec-attachments').style.display = 'block';
+    renderAttachments();
+  }
+
+  // KI-Analyse: NICHT automatisch starten – Kosten-Schutz
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) {
+    document.getElementById('analysis-text').textContent = 'Kein Claude API Key. Bitte in Einstellungen eintragen.';
+    document.getElementById('btn-analyze').disabled = true;
+    showToast('Claude API Key fehlt – bitte in Einstellungen eintragen', 'info');
+  } else {
+    // Pruefen ob Mail alt ist (aelter als heute)
+    var mailDate = Office.context.mailbox.item.dateTimeCreated;
+    var isOldMail = false;
+    if (mailDate) {
+      var today = new Date();
+      today.setHours(0,0,0,0);
+      var mailDay = new Date(mailDate);
+      mailDay.setHours(0,0,0,0);
+      isOldMail = mailDay < today;
+    }
+    state.isOldMail = isOldMail;
+
+    // Pruefen ob Cache existiert
+    var cached = getAnalysisCache(state.mailId);
+    if (cached) {
+      // Cache gefunden – Ergebnis direkt anzeigen, kein API-Call
+      state.analysis = cached;
+      applyAnalysis(cached);
+      document.getElementById('analysis-text').textContent += '\n(aus Cache geladen – kein API-Call)';
+      document.getElementById('btn-analyze').style.display = 'none';
+      document.getElementById('btn-reanalyze').style.display = 'inline-block';
+    } else if (isOldMail) {
+      // Alte Mail – Warnung zeigen, nicht automatisch analysieren
+      document.getElementById('analysis-text').textContent = 'Alte Mail – nicht automatisch analysiert.';
+      document.getElementById('mail-age-warning').style.display = 'block';
+    } else {
+      // Neue Mail, kein Cache – Button anzeigen, NICHT automatisch starten
+      document.getElementById('analysis-text').textContent = 'Klicke "Jetzt analysieren" um die KI-Analyse zu starten.';
+    }
+  }
+}
+
+/* ========== ORDNER DROPDOWN ========== */
+function populateFolderDropdown() {
+  var sel = document.getElementById('folder-select');
+  sel.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+  if (gedaechtnis.ordnerRegeln && gedaechtnis.ordnerRegeln.bekannte_ordner) {
+    gedaechtnis.ordnerRegeln.bekannte_ordner.forEach(function(f) {
+      var opt = document.createElement('option');
+      opt.value = f;
+      opt.textContent = f;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+/* ========== ANHAENGE RENDERN ========== */
+function renderAttachments() {
+  var list = document.getElementById('att-list');
+  list.innerHTML = '';
+  var onedriveFolders = [];
+  if (gedaechtnis.anhangRegeln && gedaechtnis.anhangRegeln.ordner) {
+    var o = gedaechtnis.anhangRegeln.ordner;
+    Object.keys(o).forEach(function(cat) {
+      o[cat].forEach(function(sub) { onedriveFolders.push(cat + ' / ' + sub); });
+    });
+  }
+  state.attachments.forEach(function(att, idx) {
+    var div = document.createElement('div');
+    div.className = 'att-item';
+    var nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = att.suggestedName || att.name;
+    nameInput.id = 'att-name-' + idx;
+    var folderSel = document.createElement('select');
+    folderSel.id = 'att-folder-' + idx;
+    folderSel.innerHTML = '<option value="">Ordner...</option>';
+    onedriveFolders.forEach(function(f) {
+      folderSel.innerHTML += '<option value="' + f + '"' + (f === att.suggestedFolder ? ' selected' : '') + '>' + f + '</option>';
+    });
+    div.appendChild(nameInput);
+    div.appendChild(folderSel);
+    list.appendChild(div);
+  });
+}
+
+/* ========== ANALYSE-CACHE (localStorage, pro Mail-ID) ========== */
+function getAnalysisCache(mailId) {
+  if (!mailId) return null;
+  try {
+    var cache = JSON.parse(localStorage.getItem('ki_analysis_cache') || '{}');
+    return cache[mailId] || null;
+  } catch(e) { return null; }
+}
+
+function setAnalysisCache(mailId, result) {
+  if (!mailId) return;
+  try {
+    var cache = JSON.parse(localStorage.getItem('ki_analysis_cache') || '{}');
+    // Max 200 Eintraege behalten (aelteste loeschen)
+    var keys = Object.keys(cache);
+    if (keys.length > 200) {
+      delete cache[keys[0]];
+    }
+    cache[mailId] = result;
+    localStorage.setItem('ki_analysis_cache', JSON.stringify(cache));
+  } catch(e) { console.warn('Cache-Fehler:', e); }
+}
+
+/* ========== ANALYSE STARTEN (manuell) ========== */
+function startAnalysis(forceRefresh) {
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) {
+    showToast('Kein Claude API Key – bitte in Einstellungen eintragen', 'error');
+    return;
+  }
+
+  // Bei Force-Refresh: Cache fuer diese Mail loeschen
+  if (forceRefresh) {
+    var cache = JSON.parse(localStorage.getItem('ki_analysis_cache') || '{}');
+    delete cache[state.mailId];
+    localStorage.setItem('ki_analysis_cache', JSON.stringify(cache));
+  }
+
+  // Nicht aus Cache? Dann API-Call
+  if (!forceRefresh) {
+    var cached = getAnalysisCache(state.mailId);
+    if (cached) {
+      state.analysis = cached;
+      applyAnalysis(cached);
+      showToast('Aus Cache geladen (kein API-Call)', 'info');
+      return;
+    }
+  }
+
+  analyzeEmail();
+}
+
+/* ========== KI ANALYSE ========== */
+async function analyzeEmail() {
+  document.getElementById('analysis-text').innerHTML = '<div class="loading"><div class="spinner"></div><span>KI analysiert...</span></div>';
+
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey) return;
+
+  // Gedaechtnis als Kontext zusammenbauen
+  var context = '';
+  if (gedaechtnis.profil) context += '=== PROFIL DES NUTZERS ===\n' + gedaechtnis.profil + '\n\n';
+  if (gedaechtnis.ordnerRegeln) context += '=== ORDNER-REGELN ===\n' + JSON.stringify(gedaechtnis.ordnerRegeln, null, 2) + '\n\n';
+  if (gedaechtnis.anhangRegeln) context += '=== ANHANG-REGELN ===\n' + JSON.stringify(gedaechtnis.anhangRegeln, null, 2) + '\n\n';
+  if (gedaechtnis.antwortRegeln) context += '=== ANTWORT-REGELN ===\n' + JSON.stringify(gedaechtnis.antwortRegeln, null, 2) + '\n\n';
+  if (gedaechtnis.feedback) context += '=== BISHERIGES FEEDBACK ===\n' + gedaechtnis.feedback + '\n\n';
+
+  // Anhang-Info
+  var attInfo = state.attachments.length > 0
+    ? state.attachments.map(function(a) { return '- ' + a.name + ' (' + Math.round((a.size||0)/1024) + ' KB)'; }).join('\n')
+    : 'Keine Anhaenge';
+
+  var heute = new Date().toISOString().slice(0,10).replace(/-/g,'').slice(2); // JJMMTT
+
+  var prompt = 'Du bist der persoenliche KI-Mail-Assistent von Ole Reinpold. Analysiere die folgende E-Mail.\n\n'
+    + context
+    + '=== E-MAIL ===\n'
+    + 'Von: ' + state.from + ' <' + state.fromEmail + '>\n'
+    + 'Betreff: ' + state.subject + '\n'
+    + 'Anhaenge:\n' + attInfo + '\n'
+    + 'Heutiges Datum fuer Dateinamen: ' + heute + '\n\n'
+    + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
+    + '=== AUFGABE ===\n'
+    + 'Antworte NUR als JSON (kein Markdown, kein Text drumherum):\n'
+    + '{\n'
+    + '  "prioritaet": "wd|w|m|nth|na",\n'
+    + '  "analyse": "2-3 Saetze: Worum geht es, was wird erwartet",\n'
+    + '  "ordner": "Genauer Ordnername aus der Ordner-Liste",\n'
+    + '  "antwort_noetig": true/false,\n'
+    + '  "antwort_entwurf": "Antwort-Text in Oles Stil (oder leer wenn nicht noetig)",\n'
+    + '  "aufgaben": ["Aufgabe 1", "Aufgabe 2"] (max 3, NUR was ueber Antworten+Ablegen hinausgeht),\n'
+    + '  "anhaenge": [{"original": "Originalname.pdf", "vorschlag": "' + heute + '_Organisation_Beschreibung.pdf", "ordner": "EHC / Eingangsrechnungen"}]\n'
+    + '}\n';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) {
+      var errText = await response.text();
+      throw new Error('API Fehler ' + response.status + ': ' + errText.substring(0, 200));
+    }
+
+    var data = await response.json();
+    var text = data.content[0].text;
+
+    // JSON parsen (auch wenn Claude Markdown-Backticks drumherum packt)
+    var jsonStr = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    var result = JSON.parse(jsonStr);
+    state.analysis = result;
+    setAnalysisCache(state.mailId, result);
+    applyAnalysis(result);
+
+    // Buttons umschalten: "Jetzt analysieren" weg, "Neu analysieren" zeigen
+    document.getElementById('btn-analyze').style.display = 'none';
+    document.getElementById('btn-reanalyze').style.display = 'inline-block';
+    document.getElementById('mail-age-warning').style.display = 'none';
+
+  } catch(e) {
+    console.error('Analyse-Fehler:', e);
+    document.getElementById('analysis-text').textContent = 'Fehler: ' + e.message;
+    showToast('KI-Analyse fehlgeschlagen: ' + e.message, 'error');
+  }
+}
+
+function applyAnalysis(a) {
+  // Analyse-Text
+  document.getElementById('analysis-text').textContent = a.analyse || 'Keine Analyse';
+
+  // Prioritaet
+  if (a.prioritaet) {
+    state.prio = a.prioritaet;
+    document.querySelectorAll('.prio-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.p === a.prioritaet);
+    });
+  }
+
+  // Ordner
+  if (a.ordner) {
+    state.folder = a.ordner;
+    var sel = document.getElementById('folder-select');
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === a.ordner) { sel.selectedIndex = i; break; }
+    }
+  }
+
+  // Antwort
+  if (a.antwort_noetig !== undefined) {
+    state.replyNeeded = a.antwort_noetig;
+    document.getElementById('reply-toggle').checked = a.antwort_noetig;
+    document.getElementById('reply-label').textContent = a.antwort_noetig ? 'Antwort noetig' : 'Keine Antwort noetig';
+    document.getElementById('reply-area').style.display = a.antwort_noetig ? 'block' : 'none';
+  }
+  if (a.antwort_entwurf) {
+    state.replyText = a.antwort_entwurf;
+    document.getElementById('reply-text').value = a.antwort_entwurf;
+  }
+
+  // Aufgaben
+  if (a.aufgaben && a.aufgaben.length > 0) {
+    state.tasks = a.aufgaben.map(function(t) { return { text: t, done: false }; });
+    renderTasks();
+  }
+
+  // Anhaenge
+  if (a.anhaenge && a.anhaenge.length > 0) {
+    a.anhaenge.forEach(function(suggestion) {
+      state.attachments.forEach(function(att, idx) {
+        if (att.name === suggestion.original || att.name.includes(suggestion.original.split('.')[0])) {
+          att.suggestedName = suggestion.vorschlag;
+          att.suggestedFolder = suggestion.ordner;
+        }
+      });
+    });
+    renderAttachments();
+  }
+
+  showToast('KI-Analyse abgeschlossen', 'success');
+}
+
+/* ========== UI INTERACTIONS ========== */
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+function setPrio(btn) {
+  document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  state.prio = btn.dataset.p;
+}
+
+function onReplyToggle() {
+  var on = document.getElementById('reply-toggle').checked;
+  state.replyNeeded = on;
+  document.getElementById('reply-label').textContent = on ? 'Antwort noetig' : 'Keine Antwort noetig';
+  document.getElementById('reply-area').style.display = on ? 'block' : 'none';
+}
+
+function renderTasks() {
+  var list = document.getElementById('task-list');
+  list.innerHTML = '';
+  state.tasks.forEach(function(t, i) {
+    var div = document.createElement('div');
+    div.className = 'task-item';
+    div.innerHTML = '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggleTask(' + i + ')">'
+      + '<span class="task-text ' + (t.done ? 'done' : '') + '">' + t.text + '</span>';
+    list.appendChild(div);
+  });
+}
+
+function toggleTask(i) {
+  state.tasks[i].done = !state.tasks[i].done;
+  renderTasks();
+}
+
+function addTask() {
+  var input = document.getElementById('new-task');
+  var text = input.value.trim();
+  if (!text) return;
+  state.tasks.push({ text: text, done: false });
+  input.value = '';
+  renderTasks();
+}
+
+/* ========== FEEDBACK ========== */
+function sendFeedback(correct) {
+  if (correct) {
+    saveFeedbackToStorage(true, '');
+    showToast('Danke! KI lernt daraus.', 'success');
+  } else {
+    document.getElementById('fb-detail').style.display = 'block';
+  }
+}
+
+function submitFeedback() {
+  var text = document.getElementById('fb-text').value.trim();
+  saveFeedbackToStorage(false, text);
+  document.getElementById('fb-detail').style.display = 'none';
+  document.getElementById('fb-text').value = '';
+  showToast('Feedback gespeichert. KI lernt daraus.', 'success');
+}
+
+function saveFeedbackToStorage(correct, text) {
+  var feedbackLog = JSON.parse(localStorage.getItem('ki_feedback_log') || '[]');
+  feedbackLog.push({
+    datum: new Date().toISOString(),
+    mail_betreff: state.subject,
+    mail_von: state.fromEmail,
+    korrekt: correct,
+    kommentar: text,
+    ki_vorschlag: {
+      prio: state.analysis ? state.analysis.prioritaet : '',
+      ordner: state.analysis ? state.analysis.ordner : '',
+      antwort_noetig: state.analysis ? state.analysis.antwort_noetig : null
+    },
+    korrektur: {
+      prio: state.prio,
+      ordner: document.getElementById('folder-select').value,
+      antwort_noetig: state.replyNeeded
+    }
+  });
+  localStorage.setItem('ki_feedback_log', JSON.stringify(feedbackLog));
+}
+
+/* ========== PLACEHOLDER ACTIONS (Graph API kommt als naechstes) ========== */
+async function generateReply() {
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
+
+  document.getElementById('reply-text').value = 'Antwort wird generiert...';
+
+  var stilInfo = gedaechtnis.antwortRegeln ? JSON.stringify(gedaechtnis.antwortRegeln.antwort_stil) : '';
+  var prompt = 'Du schreibst als Ole Reinpold eine Antwort auf diese E-Mail.\n\n'
+    + 'Stil: ' + stilInfo + '\n\n'
+    + 'Urspruengliche Mail:\nVon: ' + state.from + '\nBetreff: ' + state.subject + '\n\n' + (state.body || '').substring(0, 2000) + '\n\n'
+    + 'Schreibe NUR die Antwort, keine Erklaerung. Beginne direkt mit der Anrede. Am Ende KEINE Signatur (wird automatisch angehaengt).';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    var data = await response.json();
+    var reply = data.content[0].text;
+    state.replyText = reply;
+    document.getElementById('reply-text').value = reply;
+  } catch(e) {
+    document.getElementById('reply-text').value = 'Fehler: ' + e.message;
+  }
+}
+
+function moveMailToFolder() {
+  showToast('Mail verschieben: Graph API Auth wird noch eingebaut', 'info');
+}
+
+function uploadAllAttachments() {
+  showToast('OneDrive-Upload: Graph API Auth wird noch eingebaut', 'info');
+}
+
+function sendReply() {
+  showToast('Mail senden: Graph API Auth wird noch eingebaut', 'info');
+}
+
+function saveDraft() {
+  showToast('Entwurf speichern: Graph API Auth wird noch eingebaut', 'info');
+}
+
+function executeAll() {
+  showToast('Alles ausfuehren: Graph API Auth wird noch eingebaut', 'info');
+  saveFeedbackToStorage(true, '');
+}
+
+/* ========== TOAST ========== */
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || 'info');
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 3000);
+}
+</script>
+</body>
+</html>
