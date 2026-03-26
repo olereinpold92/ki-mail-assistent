@@ -41,6 +41,7 @@
     .prio-btn[data-a="nachhalten"].active { background: #42a5f5; }
     .prio-btn[data-a="ablage"].active { background: #66bb6a; }
     .prio-btn[data-a="loeschen"].active { background: #9e9e9e; }
+    .prio-btn[data-rm].active { background: #0078d4; color: white; border-color: #0078d4; }
 
     /* Folder select */
     select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
@@ -137,6 +138,24 @@
     .config-panel label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 12px; }
     .config-panel input[type=text], .config-panel input[type=password] { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
 
+    /* Chat */
+    .chat-messages { max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px; margin-bottom: 8px; background: #fafafa; }
+    .chat-msg { margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; max-width: 90%; word-wrap: break-word; white-space: pre-wrap; }
+    .chat-msg.user { background: #0078d4; color: white; margin-left: auto; border-bottom-right-radius: 2px; }
+    .chat-msg.assistant { background: #e8e8e8; color: #333; border-bottom-left-radius: 2px; }
+    .chat-msg .chat-label { font-size: 10px; font-weight: 600; margin-bottom: 2px; opacity: 0.7; }
+    .chat-input-row { display: flex; gap: 4px; align-items: flex-end; }
+    .chat-input-row textarea { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; resize: none; min-height: 32px; max-height: 32px; transition: all 0.2s; }
+    .chat-input-row textarea:focus { min-height: 80px; max-height: 120px; }
+    .chat-thread-info { font-size: 10px; color: #888; margin-bottom: 6px; }
+    /* Chat Vollbild-Modus */
+    #sec-chat.chat-fullscreen { position: fixed; inset: 0; z-index: 50; margin: 0; border-radius: 0; display: flex; flex-direction: column; }
+    #sec-chat.chat-fullscreen .section-head { flex-shrink: 0; }
+    #sec-chat.chat-fullscreen .section-body { flex: 1; display: flex !important; flex-direction: column; overflow: hidden; padding-bottom: 8px; }
+    #sec-chat.chat-fullscreen .chat-messages { flex: 1; max-height: none; }
+    .chat-close-btn { display: none; background: #d32f2f; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+    #sec-chat.chat-fullscreen .chat-close-btn { display: inline-block; }
+
     /* Status toast */
     .toast { position: fixed; bottom: 16px; left: 8px; right: 8px; padding: 10px 14px; border-radius: 6px; color: white; font-size: 12px; z-index: 200; display: none; }
     .toast.success { background: #107c10; }
@@ -186,6 +205,12 @@
         <button class="prio-btn" data-a="ablage" onclick="setAktion(this)">Ablage</button>
         <button class="prio-btn" data-a="loeschen" onclick="setAktion(this)">Loeschen</button>
       </div>
+      <div id="block-sender-area" style="display:none;margin-top:8px;padding:8px;background:#fff3cd;border-radius:4px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" id="block-sender-toggle" onchange="onBlockToggle()">
+          Domain <strong id="block-domain"></strong> kuenftig sperren
+        </label>
+      </div>
     </div>
   </div>
 
@@ -200,6 +225,22 @@
       </div>
       <div id="mail-age-warning" style="display:none; margin-top:6px; padding:6px 8px; background:#fff3cd; border-radius:4px; font-size:11px; color:#856404;">
         Diese Mail ist aelter als heute. Analyse moeglich, aber nur manuell.
+      </div>
+    </div>
+  </div>
+
+  <!-- KI fragen (Chat) -->
+  <div class="section" id="sec-chat">
+    <div class="section-head" onclick="toggleChatSection()">KI fragen <button class="chat-close-btn" onclick="event.stopPropagation();closeChatFullscreen()">Minimieren</button> <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="chat-thread-info" id="chat-thread-info"></div>
+      <div class="chat-messages" id="chat-messages" style="display:none"></div>
+      <div class="chat-input-row">
+        <textarea id="chat-input" placeholder="Frage zur Mail stellen..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askKI();}" onfocus="openChatFullscreen()"></textarea>
+        <button class="btn btn-primary btn-sm" onclick="askKI()">Fragen</button>
+      </div>
+      <div class="btn-row" id="chat-reply-btn" style="display:none;margin-top:4px">
+        <button class="btn btn-success btn-sm" onclick="generateReplyFromChat()">Antwort daraus formulieren</button>
       </div>
     </div>
   </div>
@@ -258,10 +299,14 @@
         <div class="btn-row">
           <button class="btn btn-primary btn-sm" onclick="refineOrGenerate()">KI formulieren</button>
         </div>
-        <div class="btn-row" style="margin-top:4px">
-          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook('reply')">Antworten</button>
-          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook('replyAll')">Allen antworten</button>
-          <button class="btn btn-outline btn-sm" onclick="openReplyInOutlook('forward')">Weiterleiten</button>
+        <div style="font-size:11px;color:#666;margin-top:6px;margin-bottom:4px;">Antwort-Modus:</div>
+        <div class="prio-row" id="reply-mode-row">
+          <button class="prio-btn active" data-rm="replyAll" onclick="setReplyMode(this)">Allen antworten</button>
+          <button class="prio-btn" data-rm="reply" onclick="setReplyMode(this)">Antworten</button>
+          <button class="prio-btn" data-rm="forward" onclick="setReplyMode(this)">Weiterleiten</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook()">Antwort oeffnen</button>
         </div>
       </div>
     </div>
@@ -293,6 +338,7 @@
         </label>
         <span id="fb-toggle-label" style="font-size:12px;color:#107c10;font-weight:600">Alles korrekt</span>
       </div>
+      <div id="fb-detail" style="display:none"></div>
       <textarea id="fb-text" class="reply-expandable" placeholder="Hinweise oder Feedback fuer die KI..." style="min-height:36px;max-height:36px" onfocus="this.style.minHeight='80px';this.style.maxHeight='120px'" onblur="if(!this.value)this.style.minHeight='36px';if(!this.value)this.style.maxHeight='36px'"></textarea>
       <div class="btn-row" style="margin-top:4px">
         <button class="btn btn-primary btn-sm" onclick="submitFeedback()">Feedback speichern</button>
@@ -342,6 +388,11 @@ var state = {
   replyNeeded: false,
   replyText: '',
   tasks: [],
+  replyMode: 'replyAll',
+  chatMessages: [],
+  threadMails: null,
+  threadAttachments: null,
+  threadLoaded: false,
   graphToken: null
 };
 
@@ -870,6 +921,42 @@ function saveAblageRegeln(regeln) {
   try {
     localStorage.setItem('ki_ablage_regeln', JSON.stringify(regeln));
   } catch(e) {}
+  // Auch auf Festplatte speichern (persistent, Git-faehig)
+  saveToGedaechtnis('regeln/gelernte_regeln.json', regeln);
+}
+
+// Neues Wissen in entries.json lernen (Tag-basiertes System)
+function learnToEntries(id, text, tags, source) {
+  // Pruefen ob Eintrag mit gleicher ID existiert
+  var existing = gedaechtnis.entries.findIndex(function(e) { return e.id === id; });
+  if (existing >= 0) {
+    // Bestehenden Eintrag aktualisieren: weight erhoehen, Tags ergaenzen
+    var entry = gedaechtnis.entries[existing];
+    entry.weight = Math.min(1.0, (entry.weight || 0.5) + 0.1);
+    entry.use_count = (entry.use_count || 0) + 1;
+    entry.last_used = new Date().toISOString().slice(0, 10);
+    entry.text = text; // Text aktualisieren falls sich was geaendert hat
+    // Neue Tags ergaenzen
+    tags.forEach(function(t) {
+      if (t && entry.tags.indexOf(t) === -1) entry.tags.push(t);
+    });
+  } else {
+    // Neuer Eintrag
+    gedaechtnis.entries.push({
+      id: id,
+      text: text,
+      tags: tags.filter(function(t) { return t && t.length > 0; }),
+      scope: 'spezifisch',
+      weight: 0.6,
+      use_count: 1,
+      last_used: new Date().toISOString().slice(0, 10),
+      learned_from: source || 'feedback',
+      summary: text.length > 60 ? text.substring(0, 57) + '...' : text
+    });
+  }
+  // Auf Festplatte speichern
+  saveToGedaechtnis('entries.json', gedaechtnis.entries);
+  console.log('[Entries] Gelernt: ' + id + ' (gesamt: ' + gedaechtnis.entries.length + ')');
 }
 
 function learnMailFolder(email, folderName) {
@@ -882,7 +969,6 @@ function learnMailFolder(email, folderName) {
     return r.domain === domain && r.mailFolder === folderName;
   });
   if (existing) {
-    // Keywords ergaenzen
     keywords.forEach(function(k) {
       if (existing.keywords.indexOf(k) === -1) existing.keywords.push(k);
     });
@@ -890,6 +976,11 @@ function learnMailFolder(email, folderName) {
     regeln.push({ domain: domain, email: email.toLowerCase(), keywords: keywords, mailFolder: folderName, attachFolder: '', note: '' });
   }
   saveAblageRegeln(regeln);
+  // Auch in entries.json lernen (neues System)
+  learnToEntries('ordner_' + domain.replace(/\./g, '_') + '_' + folderName.replace(/[^a-z0-9]/gi, '_').toLowerCase(),
+    'Mails von ' + domain + ' gehoeren nach ' + folderName,
+    [domain.split('.')[0], 'ordner-zuordnung'].concat(keywords),
+    'feedback');
   console.log('Gelernt: ' + domain + ' + [' + keywords.join(',') + '] → ' + folderName);
 }
 
@@ -915,6 +1006,11 @@ function learnAttachmentFolder(email, onedrivePath) {
     }
   }
   saveAblageRegeln(regeln);
+  // Auch in entries.json lernen
+  learnToEntries('anhang_' + domain.replace(/\./g, '_') + '_' + onedrivePath.replace(/[^a-z0-9]/gi, '_').toLowerCase(),
+    'Anhaenge von ' + domain + ' in OneDrive unter ' + onedrivePath + ' ablegen',
+    [domain.split('.')[0], 'anhang', 'onedrive'].concat(keywords),
+    'feedback');
 }
 
 function extractKeywords(text) {
@@ -1008,8 +1104,74 @@ var gedaechtnis = {
   ordnerRegeln: null,
   anhangRegeln: null,
   antwortRegeln: null,
-  feedback: ''
+  feedback: '',
+  gelernteRegeln: [],
+  feedbackLog: [],
+  analysisLog: [],
+  entries: []  // Tag-basierte Wissens-Eintraege (neues System)
 };
+
+// Gedaechtnis-Datei auf Festplatte speichern (via Server)
+async function saveToGedaechtnis(pfad, daten) {
+  try {
+    var base = window.location.origin;
+    var res = await fetch(base + '/api/gedaechtnis/' + pfad, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(daten)
+    });
+    if (res && res.ok) {
+      console.log('[Gedaechtnis] Gespeichert: ' + pfad);
+      return true;
+    } else {
+      console.warn('[Gedaechtnis] Fehler beim Speichern von ' + pfad + ': HTTP ' + (res ? res.status : 'null'));
+      return false;
+    }
+  } catch(e) {
+    console.warn('[Gedaechtnis] Server nicht erreichbar fuer ' + pfad + ':', e.message);
+    return false;
+  }
+}
+
+// Kompletten Bearbeitungs-Vorgang auf Festplatte speichern
+// Wird bei "Alles ausfuehren" aufgerufen – dokumentiert KI-Analyse + Oles Entscheidungen
+function saveAnalysisLog(aktionen) {
+  var eintrag = {
+    datum: new Date().toISOString(),
+    mail_id: state.restMailId ? state.restMailId.substring(0, 40) : '',
+    mail_betreff: state.subject,
+    mail_von: state.from + ' <' + state.fromEmail + '>',
+    ki_analyse: state.analysis ? {
+      aktion: state.analysis.aktion,
+      ordner: state.analysis.ordner,
+      antwort_noetig: state.analysis.antwort_noetig,
+      antwort_modus: state.analysis.antwort_modus || '',
+      aufgaben: state.analysis.aufgaben || [],
+      anhaenge: state.analysis.anhaenge || []
+    } : null,
+    entscheidung: {
+      aktion: state.aktion,
+      ordner: document.getElementById('folder-input').value,
+      antwort_noetig: state.replyNeeded,
+      antwort_modus: state.replyMode,
+      antwort_text: document.getElementById('reply-text').value.trim() ? '(vorhanden, ' + document.getElementById('reply-text').value.trim().length + ' Zeichen)' : '',
+      aufgaben: state.tasks.map(function(t) { return { text: t.text, done: t.done }; }),
+      anhaenge_ordner: odCurrentPath.map(function(p) { return p.name; }).join(' / ') || 'nicht gewaehlt'
+    },
+    aktionen_ausgefuehrt: aktionen,
+    feedback: {
+      korrekt: document.getElementById('fb-correct-toggle').checked,
+      kommentar: document.getElementById('fb-text').value.trim()
+    }
+  };
+  gedaechtnis.analysisLog.push(eintrag);
+  // Nur die letzten 200 Eintraege behalten (aelteste weg)
+  if (gedaechtnis.analysisLog.length > 200) {
+    gedaechtnis.analysisLog = gedaechtnis.analysisLog.slice(-200);
+  }
+  saveToGedaechtnis('feedback/analysis_log.json', gedaechtnis.analysisLog);
+  console.log('[Gedaechtnis] Bearbeitungs-Log gespeichert: ' + state.subject);
+}
 
 /* ========== INIT ========== */
 Office.onReady(function(info) {
@@ -1070,17 +1232,127 @@ async function loadGedaechtnis() {
       fetch(base + '/gedaechtnis/regeln/ordner.json').then(r => r.ok ? r.json() : null),
       fetch(base + '/gedaechtnis/regeln/anhaenge.json').then(r => r.ok ? r.json() : null),
       fetch(base + '/gedaechtnis/regeln/antworten.json').then(r => r.ok ? r.json() : null),
-      fetch(base + '/gedaechtnis/feedback/zusammenfassung.md').then(r => r.ok ? r.text() : '')
+      fetch(base + '/gedaechtnis/feedback/zusammenfassung.md').then(r => r.ok ? r.text() : ''),
+      fetch(base + '/gedaechtnis/regeln/gelernte_regeln.json').then(r => r.ok ? r.json() : []),
+      fetch(base + '/gedaechtnis/feedback/feedback_log.json').then(r => r.ok ? r.json() : []),
+      fetch(base + '/gedaechtnis/feedback/analysis_log.json').then(r => r.ok ? r.json() : []),
+      fetch(base + '/gedaechtnis/entries.json').then(r => r.ok ? r.json() : [])
     ]);
     gedaechtnis.profil = results[0].status === 'fulfilled' ? results[0].value : '';
     gedaechtnis.ordnerRegeln = results[1].status === 'fulfilled' ? results[1].value : null;
     gedaechtnis.anhangRegeln = results[2].status === 'fulfilled' ? results[2].value : null;
     gedaechtnis.antwortRegeln = results[3].status === 'fulfilled' ? results[3].value : null;
     gedaechtnis.feedback = results[4].status === 'fulfilled' ? results[4].value : '';
-    console.log('Gedaechtnis geladen:', Object.keys(gedaechtnis).map(k => k + '=' + (gedaechtnis[k] ? 'OK' : 'leer')).join(', '));
+    gedaechtnis.gelernteRegeln = results[5].status === 'fulfilled' ? (results[5].value || []) : [];
+    gedaechtnis.feedbackLog = results[6].status === 'fulfilled' ? (results[6].value || []) : [];
+    gedaechtnis.analysisLog = results[7].status === 'fulfilled' ? (results[7].value || []) : [];
+
+    // Gelernte Regeln von Festplatte haben Vorrang vor localStorage
+    if (gedaechtnis.gelernteRegeln.length > 0) {
+      localStorage.setItem('ki_ablage_regeln', JSON.stringify(gedaechtnis.gelernteRegeln));
+      console.log('[Gedaechtnis] ' + gedaechtnis.gelernteRegeln.length + ' gelernte Regeln von Festplatte geladen');
+    } else {
+      // Fallback: localStorage in gedaechtnis uebernehmen
+      var lsRegeln = JSON.parse(localStorage.getItem('ki_ablage_regeln') || '[]');
+      if (lsRegeln.length > 0) {
+        gedaechtnis.gelernteRegeln = lsRegeln;
+        // Einmalig auf Festplatte sichern (Migration)
+        saveToGedaechtnis('regeln/gelernte_regeln.json', lsRegeln);
+        console.log('[Gedaechtnis] ' + lsRegeln.length + ' Regeln aus localStorage migriert');
+      }
+    }
+
+    // Feedback-Log von Festplatte laden
+    if (gedaechtnis.feedbackLog.length > 0) {
+      localStorage.setItem('ki_feedback_log', JSON.stringify(gedaechtnis.feedbackLog));
+      console.log('[Gedaechtnis] ' + gedaechtnis.feedbackLog.length + ' Feedback-Eintraege von Festplatte geladen');
+    } else {
+      // Fallback: localStorage in gedaechtnis uebernehmen
+      var lsFeedback = JSON.parse(localStorage.getItem('ki_feedback_log') || '[]');
+      if (lsFeedback.length > 0) {
+        gedaechtnis.feedbackLog = lsFeedback;
+        saveToGedaechtnis('feedback/feedback_log.json', lsFeedback);
+        console.log('[Gedaechtnis] ' + lsFeedback.length + ' Feedback-Eintraege aus localStorage migriert');
+      }
+    }
+
+    // Tag-basierte Entries laden (neues Gedaechtnis-System)
+    gedaechtnis.entries = results[8].status === 'fulfilled' ? (results[8].value || []) : [];
+    console.log('[Gedaechtnis] ' + gedaechtnis.entries.length + ' Wissens-Eintraege geladen');
+
+    console.log('Gedaechtnis geladen: Profil=' + (gedaechtnis.profil ? 'OK' : 'leer')
+      + ', Regeln=' + gedaechtnis.gelernteRegeln.length
+      + ', Entries=' + gedaechtnis.entries.length
+      + ', Feedback=' + gedaechtnis.feedbackLog.length);
   } catch(e) {
     console.warn('Gedaechtnis laden fehlgeschlagen:', e);
   }
+}
+
+// Tag-basiertes Retrieval: Nur relevante Wissens-Eintraege fuer eine Mail laden
+function getRelevantEntries(fromEmail, subject, hasAttachments) {
+  if (!gedaechtnis.entries || gedaechtnis.entries.length === 0) return [];
+
+  // Tags aus der Mail extrahieren
+  var mailTags = [];
+
+  // Absender-Domain (z.B. atos.de → "atos")
+  if (fromEmail) {
+    var domain = fromEmail.split('@')[1] || '';
+    var domainParts = domain.replace(/\.(de|com|net|org|eu|io)$/i, '').split('.');
+    domainParts.forEach(function(part) {
+      if (part.length > 2) mailTags.push(part.toLowerCase());
+    });
+  }
+
+  // Betreff-Keywords
+  if (subject) {
+    var keywords = subject.toLowerCase()
+      .replace(/[^a-zäöüß\s]/g, ' ')
+      .split(/\s+/)
+      .filter(function(w) { return w.length > 3; });
+    // Bekannte relevante Begriffe matchen
+    var relevantWords = ['rechnung', 'bewerbung', 'vertrag', 'angebot', 'kündigung',
+      'personal', 'newsletter', 'helios', 'atos', 'stepstone', 'indeed', 'qodia',
+      'rechnung', 'finanzen', 'hospitationen', 'lebenslauf', 'gehalt'];
+    keywords.forEach(function(kw) {
+      relevantWords.forEach(function(rw) {
+        if (kw.indexOf(rw) >= 0 || rw.indexOf(kw) >= 0) mailTags.push(rw);
+      });
+    });
+  }
+
+  // Anhang-Tag
+  if (hasAttachments) mailTags.push('anhang');
+
+  // Duplikate entfernen
+  mailTags = mailTags.filter(function(t, i) { return mailTags.indexOf(t) === i; });
+
+  // Entries filtern: global + tag-match
+  var matches = gedaechtnis.entries.filter(function(entry) {
+    if (entry.scope === 'global') return true;
+    if (!entry.tags || mailTags.length === 0) return false;
+    // Mindestens ein Tag muss matchen
+    return entry.tags.some(function(tag) {
+      return mailTags.some(function(mt) {
+        return tag.indexOf(mt) >= 0 || mt.indexOf(tag) >= 0;
+      });
+    });
+  });
+
+  // Nach weight sortieren (hoeher = relevanter)
+  matches.sort(function(a, b) { return (b.weight || 0) - (a.weight || 0); });
+
+  console.log('[Retrieval] Mail-Tags: [' + mailTags.join(', ') + '] → ' + matches.length + ' Eintraege');
+  return matches;
+}
+
+// Relevante Entries als Text fuer den Prompt formatieren
+function formatEntriesForPrompt(entries) {
+  if (!entries || entries.length === 0) return '';
+  return 'GELERNTES WISSEN (nur fuer diese Mail relevante Eintraege):\n'
+    + entries.map(function(e) { return '- ' + e.text; }).join('\n')
+    + '\n\n';
 }
 
 /* ========== UI RESET BEI MAIL-WECHSEL ========== */
@@ -1107,8 +1379,22 @@ function resetUIForNewMail() {
   document.getElementById('reply-label').textContent = 'Keine Antwort noetig';
   document.getElementById('reply-area').style.display = 'none';
   document.getElementById('reply-text').value = '';
+  state.replyMode = 'replyAll';
+  document.querySelectorAll('#reply-mode-row .prio-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.rm === 'replyAll');
+  });
   document.getElementById('task-list').innerHTML = '';
   document.getElementById('analysis-text').textContent = 'Noch nicht analysiert.';
+  // Chat zuruecksetzen
+  state.chatMessages = [];
+  state.threadMails = null;
+  state.threadAttachments = null;
+  state.threadLoaded = false;
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('chat-messages').style.display = 'none';
+  document.getElementById('chat-thread-info').textContent = '';
+  document.getElementById('chat-input').value = '';
+  document.getElementById('chat-reply-btn').style.display = 'none';
   document.getElementById('att-list').innerHTML = '';
   document.getElementById('sec-attachments').style.display = 'none';
   document.getElementById('fb-detail').style.display = 'none';
@@ -1222,12 +1508,12 @@ function onMailLoaded() {
       document.getElementById('btn-reanalyze-top').style.display = 'inline-block';
       document.getElementById('analyze-dot').className = 'status-dot cached';
     } else if (isOldMail) {
-      // Alte Mail – Warnung zeigen, nicht automatisch analysieren
-      document.getElementById('analysis-text').textContent = 'Alte Mail – nicht automatisch analysiert.';
+      // Alte Mail – Warnung zeigen, nicht automatisch analysieren (Kostenschutz)
+      document.getElementById('analysis-text').textContent = 'Aeltere Mail – klicke "Jetzt analysieren" fuer manuelle Analyse.';
       document.getElementById('mail-age-warning').style.display = 'block';
       document.getElementById('analyze-dot').className = 'status-dot old';
     } else {
-      // Neue Mail, kein Cache – Button anzeigen, NICHT automatisch starten
+      // Neue Mail, kein Cache – manuell analysieren (Ole bevorzugt manuell)
       document.getElementById('analysis-text').textContent = 'Klicke "Jetzt analysieren" um die KI-Analyse zu starten.';
       document.getElementById('analyze-dot').className = 'status-dot new';
     }
@@ -1330,6 +1616,29 @@ async function analyzeEmail() {
   if (gedaechtnis.antwortRegeln) context += '=== ANTWORT-REGELN ===\n' + JSON.stringify(gedaechtnis.antwortRegeln, null, 2) + '\n\n';
   if (gedaechtnis.feedback) context += '=== BISHERIGES FEEDBACK ===\n' + gedaechtnis.feedback + '\n\n';
 
+  // Feedback-Historie: letzte 30 Korrekturen als Lernquelle
+  if (gedaechtnis.feedbackLog && gedaechtnis.feedbackLog.length > 0) {
+    var recentFeedback = gedaechtnis.feedbackLog.slice(-30);
+    var fbLines = recentFeedback.map(function(fb) {
+      var line = fb.datum.substring(0, 10) + ' | ' + fb.mail_von + ' | "' + fb.mail_betreff + '"';
+      if (fb.korrekt) {
+        line += ' → KI war korrekt';
+      } else {
+        if (fb.ki_vorschlag.aktion !== fb.korrektur.aktion) {
+          line += ' → Aktion: KI="' + fb.ki_vorschlag.aktion + '" korrigiert zu "' + fb.korrektur.aktion + '"';
+        }
+        if (fb.ki_vorschlag.ordner !== fb.korrektur.ordner) {
+          line += ' → Ordner: KI="' + fb.ki_vorschlag.ordner + '" korrigiert zu "' + fb.korrektur.ordner + '"';
+        }
+        if (fb.kommentar) line += ' (Hinweis: ' + fb.kommentar + ')';
+      }
+      return line;
+    });
+    context += '=== FEEDBACK-HISTORIE (letzte ' + recentFeedback.length + ' Korrekturen) ===\n';
+    context += fbLines.join('\n') + '\n';
+    context += 'WICHTIG: Lerne aus diesen Korrekturen! Wenn Ole einen Ordner korrigiert hat, nutze diese Zuordnung bei aehnlichen Mails.\n\n';
+  }
+
   // Anhang-Info
   var attInfo = state.attachments.length > 0
     ? state.attachments.map(function(a) { return '- ' + a.name + ' (' + Math.round((a.size||0)/1024) + ' KB)'; }).join('\n')
@@ -1345,6 +1654,7 @@ async function analyzeEmail() {
     + 'Anhaenge:\n' + attInfo + '\n'
     + 'Heutiges Datum fuer Dateinamen: ' + heute + '\n\n'
     + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
+    + formatEntriesForPrompt(getRelevantEntries(state.fromEmail, state.subject, state.attachments.length > 0))
     + '=== GESPERRTE DOMAINS ===\n'
     + (function() { try { var b = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]'); return b.length > 0 ? b.join(', ') + '\nMails von diesen Domains: immer loeschen + absender_sperren: true\n\n' : 'Keine\n\n'; } catch(e) { return 'Keine\n\n'; } })()
     + '=== GELERNTE ABLAGE-REGELN (aus frueheren Entscheidungen) ===\n'
@@ -1378,6 +1688,7 @@ async function analyzeEmail() {
     + '  "analyse": "2-3 Saetze: Worum geht es, was wird erwartet",\n'
     + '  "ordner": "Genauer Ziel-Ordnername (bei ablage: z.B. Firmen & Organisationen / Hafenklinik. Bei todo/nachhalten/loeschen: wird automatisch gesetzt)",\n'
     + '  "antwort_noetig": true/false,\n'
+    + '  "antwort_modus": "replyAll|reply|forward (Standard: replyAll. reply nur wenn 1 Empfaenger. forward wenn Ole weiterleiten soll)",\n'
     + '  "antwort_entwurf": "Antwort-Text in Oles Stil (oder leer wenn nicht noetig)",\n'
     + '  "aufgaben": ["Aufgabe 1", "Aufgabe 2"] (max 3, NUR was ueber Antworten+Ablegen hinausgeht),\n'
     + '  "anhaenge": [{"original": "Originalname.pdf", "vorschlag": "' + heute + '_Organisation_Beschreibung.pdf", "ordner": "EHC / Eingangsrechnungen"}]\n'
@@ -1491,6 +1802,13 @@ function applyAnalysis(a) {
     document.getElementById('reply-label').textContent = a.antwort_noetig ? 'Antwort noetig' : 'Keine Antwort noetig';
     document.getElementById('reply-area').style.display = a.antwort_noetig ? 'block' : 'none';
   }
+  // Antwort-Modus (KI-Vorschlag)
+  if (a.antwort_modus) {
+    state.replyMode = a.antwort_modus;
+    document.querySelectorAll('#reply-mode-row .prio-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.rm === a.antwort_modus);
+    });
+  }
   if (a.antwort_entwurf) {
     state.replyText = a.antwort_entwurf;
     document.getElementById('reply-text').value = a.antwort_entwurf;
@@ -1582,13 +1900,28 @@ function renderTasks() {
   state.tasks.forEach(function(t, i) {
     var div = document.createElement('div');
     div.className = 'task-item';
-    div.innerHTML = '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggleTask(' + i + ')">'
-      + '<span class="task-text ' + (t.done ? 'done' : '') + '">' + t.text + '</span>';
+    var cb = '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggleTask(' + i + ')">';
+    var textInput = '<input type="text" value="' + t.text.replace(/"/g, '&quot;') + '" class="task-edit" '
+      + 'onchange="editTask(' + i + ', this.value)" '
+      + 'style="flex:1;padding:2px 4px;border:1px solid #eee;border-radius:3px;font-size:12px;'
+      + (t.done ? 'text-decoration:line-through;color:#999;' : '') + '">';
+    var delBtn = '<button onclick="deleteTask(' + i + ')" style="background:none;border:none;color:#999;cursor:pointer;font-size:14px;padding:0 4px;" title="Loeschen">&times;</button>';
+    div.innerHTML = cb + textInput + delBtn;
     list.appendChild(div);
   });
-  // Button zeigen wenn Aufgaben vorhanden
   var btn = document.getElementById('task-buttons');
   if (btn) btn.style.display = state.tasks.length > 0 ? 'flex' : 'none';
+}
+
+function editTask(i, newText) {
+  if (newText.trim()) {
+    state.tasks[i].text = newText.trim();
+  }
+}
+
+function deleteTask(i) {
+  state.tasks.splice(i, 1);
+  renderTasks();
 }
 
 function toggleTask(i) {
@@ -1712,8 +2045,7 @@ function submitFeedback() {
 }
 
 function saveFeedbackToStorage(correct, text) {
-  var feedbackLog = JSON.parse(localStorage.getItem('ki_feedback_log') || '[]');
-  feedbackLog.push({
+  var eintrag = {
     datum: new Date().toISOString(),
     mail_betreff: state.subject,
     mail_von: state.fromEmail,
@@ -1729,8 +2061,15 @@ function saveFeedbackToStorage(correct, text) {
       ordner: document.getElementById('folder-input').value,
       antwort_noetig: state.replyNeeded
     }
-  });
+  };
+  // localStorage (schneller Zugriff in der Session)
+  var feedbackLog = JSON.parse(localStorage.getItem('ki_feedback_log') || '[]');
+  feedbackLog.push(eintrag);
   localStorage.setItem('ki_feedback_log', JSON.stringify(feedbackLog));
+  // Auch auf Festplatte speichern (persistent, Git-faehig)
+  // Gesamtes Log speichern (nicht nur den neuen Eintrag)
+  gedaechtnis.feedbackLog.push(eintrag);
+  saveToGedaechtnis('feedback/feedback_log.json', gedaechtnis.feedbackLog);
 }
 
 /* ========== ONEDRIVE BROWSER ========== */
@@ -1922,9 +2261,17 @@ async function generateReply() {
   document.getElementById('reply-text').value = 'Antwort wird generiert...';
 
   var stilInfo = gedaechtnis.antwortRegeln ? JSON.stringify(gedaechtnis.antwortRegeln.antwort_stil) : '';
+  // Wenn Chat-Verlauf existiert, diesen als Kontext einbeziehen
+  var chatContext = '';
+  if (state.chatMessages.length > 0) {
+    chatContext = '\n\n=== DISKUSSION MIT OLE ===\n'
+      + state.chatMessages.map(function(m) { return (m.role === 'user' ? 'Ole' : 'KI') + ': ' + m.content; }).join('\n\n')
+      + '\n\nBeruecksichtige diese Diskussion bei der Antwort!\n';
+  }
   var prompt = 'Du schreibst als Ole Reinpold eine Antwort auf diese E-Mail.\n\n'
     + 'Stil: ' + stilInfo + '\n\n'
-    + 'Urspruengliche Mail:\nVon: ' + state.from + '\nBetreff: ' + state.subject + '\n\n' + (state.body || '').substring(0, 2000) + '\n\n'
+    + 'Urspruengliche Mail:\nVon: ' + state.from + '\nBetreff: ' + state.subject + '\n\n' + (state.body || '').substring(0, 2000)
+    + chatContext + '\n\n'
     + 'Schreibe NUR die Antwort, keine Erklaerung. Beginne direkt mit der Anrede. Am Ende KEINE Signatur (wird automatisch angehaengt).';
 
   try {
@@ -1995,9 +2342,16 @@ async function refineReply() {
   }
 }
 
+// Reply-Modus auswaehlen (Radio-Buttons, nur Auswahl, oeffnet nichts)
+function setReplyMode(btn) {
+  document.querySelectorAll('#reply-mode-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  state.replyMode = btn.dataset.rm;
+}
+
 // Antwort in Outlook oeffnen (native Reply-Funktion, nie automatisch senden)
 async function openReplyInOutlook(mode) {
-  mode = mode || 'replyAll';
+  mode = mode || state.replyMode || 'replyAll';
   var replyText = document.getElementById('reply-text').value.trim();
   if (!replyText && mode !== 'forward') { showToast('Keine Antwort vorhanden', 'info'); return; }
   var item = Office.context.mailbox.item;
@@ -2098,21 +2452,12 @@ async function generateReplyWithInstruction(instruction) {
 }
 
 // Textfelder erweitern/verkleinern bei Klick
+// WICHTIG: Keine anderen Sektionen zuklappen – Ole will alles sichtbar behalten
 function expandField(el) {
-  // Alle anderen Felder verkleinern
-  document.querySelectorAll('.reply-expandable').forEach(function(ta) {
-    if (ta !== el) ta.classList.remove('field-expanded');
-  });
   el.classList.add('field-expanded');
-  // Andere Sektionen einklappen
-  ['sec-aktion', 'sec-analysis', 'sec-folder', 'sec-attachments', 'sec-tasks', 'sec-feedback'].forEach(function(id) {
-    var sec = document.getElementById(id);
-    if (sec) sec.classList.add('collapsed');
-  });
 }
 
 function shrinkField(el) {
-  // Nicht sofort verkleinern (damit man noch klicken kann)
   setTimeout(function() {
     if (document.activeElement !== el) {
       el.classList.remove('field-expanded');
@@ -2135,6 +2480,23 @@ async function moveMailToFolder() {
     // Folder-ID finden: aus bekannten Ordnern oder per API-Suche
     folderId = state.folderId || outlookFolderMap[folderName];
 
+    // Fallback: Teilname suchen (z.B. "Abrechnung" → "Firmen & Organisationen / Abrechnung")
+    if (!folderId) {
+      var folderLower = folderName.toLowerCase();
+      var keys = Object.keys(outlookFolderMap);
+      for (var fi = 0; fi < keys.length; fi++) {
+        var k = keys[fi];
+        // Exakter Blattname-Match: "Abrechnung" matcht "Firmen & Organisationen / Abrechnung"
+        var parts = k.split(' / ');
+        var leafName = parts[parts.length - 1];
+        if (leafName.toLowerCase() === folderLower && outlookFolderMap[k]) {
+          folderId = outlookFolderMap[k];
+          console.log('Ordner "' + folderName + '" gefunden als "' + k + '"');
+          break;
+        }
+      }
+    }
+
     // Fallback: per Graph API nach dem Ordnernamen suchen
     if (!folderId) {
       showToast('Ordner "' + folderName + '" wird gesucht...', 'info');
@@ -2148,12 +2510,19 @@ async function moveMailToFolder() {
   }
 
   try {
+    console.log('Mail verschieben: ' + state.restMailId.substring(0, 30) + '... → ' + folderId.substring(0, 30) + '...');
     showToast(state.aktion === 'loeschen' ? 'Mail wird geloescht...' : 'Mail wird verschoben...', 'info');
     var res = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
       method: 'POST',
       body: JSON.stringify({ destinationId: folderId })
     });
     if (res && res.ok) {
+      // WICHTIG: Nach dem Verschieben bekommt die Mail eine NEUE ID
+      var movedMsg = await res.json();
+      if (movedMsg && movedMsg.id) {
+        console.log('Mail verschoben, neue ID: ' + movedMsg.id.substring(0, 30) + '...');
+        state.restMailId = movedMsg.id;
+      }
       showToast(state.aktion === 'loeschen' ? 'Mail geloescht' : 'Mail verschoben → ' + folderName, 'success');
       // Folder-ID merken (nicht bei loeschen)
       if (folderId && state.aktion !== 'loeschen') {
@@ -2163,10 +2532,14 @@ async function moveMailToFolder() {
         learnMailFolder(state.fromEmail, folderName);
       }
     } else {
-      var err = res ? await res.json() : {};
-      showToast('Fehler: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
+      var errStatus = res ? res.status : 'null';
+      var err = {};
+      try { err = res ? await res.json() : {}; } catch(e2) {}
+      console.error('Mail verschieben fehlgeschlagen, Status:', errStatus, err);
+      showToast('Fehler: ' + (err.error ? err.error.message : 'HTTP ' + errStatus), 'error');
     }
   } catch(e) {
+    console.error('Mail verschieben Exception:', e);
     showToast('Verschieben fehlgeschlagen: ' + e.message, 'error');
   }
 }
@@ -2297,28 +2670,64 @@ async function uploadAllAttachments() {
   if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
   if (state.attachments.length === 0) { showToast('Keine Anhaenge vorhanden', 'info'); return; }
 
+  // Ziel-Ordner pruefen
+  var folderId = odSelectedFolderId && odSelectedFolderId !== 'root' ? odSelectedFolderId : null;
+  var folderInfo = folderId ? ('Ordner-ID: ' + folderId.substring(0, 20) + '...') : 'OneDrive Root (kein Ordner gewaehlt!)';
+  console.log('Upload-Start: ' + state.attachments.length + ' Anhaenge, Ziel: ' + folderInfo);
+
+  if (!folderId) {
+    showToast('Bitte erst einen OneDrive-Ordner auswaehlen', 'error');
+    return;
+  }
+
   // Alle Anhaenge von Graph laden
   showToast('Anhaenge werden geladen...', 'info');
+  console.log('Lade Anhaenge von Mail: ' + state.restMailId.substring(0, 30) + '...');
   var attRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/attachments');
-  if (!attRes || !attRes.ok) { showToast('Anhaenge konnten nicht geladen werden', 'error'); return; }
+  if (!attRes || !attRes.ok) {
+    var errStatus = attRes ? attRes.status : 'null';
+    console.error('Anhaenge laden fehlgeschlagen, Status:', errStatus);
+    if (attRes) { try { var errBody = await attRes.text(); console.error('Response:', errBody.substring(0, 500)); } catch(e) {} }
+    showToast('Anhaenge konnten nicht geladen werden (HTTP ' + errStatus + ')', 'error');
+    return;
+  }
   var attData = await attRes.json();
   var graphAttachments = attData.value || [];
+  console.log(graphAttachments.length + ' Anhaenge von Graph geladen, davon mit contentBytes: ' +
+    graphAttachments.filter(function(a) { return a.contentBytes; }).length);
 
   var erfolg = 0, fehler = 0;
   for (var idx = 0; idx < state.attachments.length; idx++) {
     var att = state.attachments[idx];
     var filename = document.getElementById('att-name-' + idx) ? document.getElementById('att-name-' + idx).value.trim() : att.name;
-    // Ordner aus dem OneDrive-Browser
-    var folderId = odSelectedFolderId && odSelectedFolderId !== 'root' ? odSelectedFolderId : null;
 
     if (!filename) { fehler++; continue; }
 
     // Passenden Graph-Anhang finden (nach Name)
     var graphAtt = graphAttachments.find(function(ga) { return ga.name === att.name; }) || graphAttachments[idx];
-    if (!graphAtt || !graphAtt.contentBytes) {
-      showToast('Anhang "' + att.name + '" nicht gefunden', 'error');
+    if (!graphAtt) {
+      console.error('Kein Graph-Anhang fuer "' + att.name + '" gefunden. Verfuegbar:', graphAttachments.map(function(a) { return a.name; }));
+      showToast('Anhang "' + att.name + '" nicht in Graph gefunden', 'error');
       fehler++;
       continue;
+    }
+    if (!graphAtt.contentBytes) {
+      console.error('Anhang "' + att.name + '" hat keine contentBytes. Typ: ' + graphAtt['@odata.type'] + ', Groesse: ' + graphAtt.size);
+      // Fallback: Einzeln laden mit contentBytes
+      console.log('Versuche Einzelabruf fuer Anhang ID: ' + graphAtt.id);
+      try {
+        var singleRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/attachments/' + graphAtt.id);
+        if (singleRes && singleRes.ok) {
+          graphAtt = await singleRes.json();
+          console.log('Einzelabruf: contentBytes vorhanden: ' + !!graphAtt.contentBytes);
+        }
+      } catch(e) { console.error('Einzelabruf fehlgeschlagen:', e); }
+
+      if (!graphAtt.contentBytes) {
+        showToast('Anhang "' + att.name + '" konnte nicht geladen werden', 'error');
+        fehler++;
+        continue;
+      }
     }
 
     // Base64 -> Blob
@@ -2326,31 +2735,37 @@ async function uploadAllAttachments() {
     var bytes = new Uint8Array(binary.length);
     for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     var blob = new Blob([bytes], { type: graphAtt.contentType || 'application/octet-stream' });
+    console.log('Blob erstellt: ' + filename + ', Groesse: ' + blob.size + ' Bytes');
 
     // Upload URL
-    var uploadUrl;
-    if (folderId) {
-      uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/items/' + folderId + ':/' + encodeURIComponent(filename) + ':/content';
-    } else {
-      uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(filename) + ':/content';
-    }
+    var uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/items/' + folderId + ':/' + encodeURIComponent(filename) + ':/content';
+    console.log('Upload URL: ' + uploadUrl);
 
     try {
       showToast('Lade "' + filename + '" hoch...', 'info');
-      var upRes = await graphFetch(uploadUrl, {
+      var token = await getGraphToken();
+      if (!token) { fehler++; continue; }
+      var upRes = await fetch(uploadUrl, {
         method: 'PUT',
-        body: blob,
-        headers: { 'Content-Type': graphAtt.contentType || 'application/octet-stream' }
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': graphAtt.contentType || 'application/octet-stream'
+        },
+        body: blob
       });
       if (upRes && upRes.ok) {
+        var upData = await upRes.json();
+        console.log('Upload erfolgreich: ' + upData.name + ' -> ' + upData.webUrl);
         erfolg++;
       } else {
-        var err = upRes ? await upRes.json() : {};
-        console.error('Upload Fehler:', err);
+        var errText = upRes ? await upRes.text() : 'null';
+        console.error('Upload Fehler ' + (upRes ? upRes.status : 'null') + ':', errText.substring(0, 500));
+        showToast('Upload "' + filename + '" fehlgeschlagen: HTTP ' + (upRes ? upRes.status : 'null'), 'error');
         fehler++;
       }
     } catch(e) {
-      console.error('Upload Fehler:', e);
+      console.error('Upload Exception:', e);
+      showToast('Upload "' + filename + '" fehlgeschlagen: ' + e.message, 'error');
       fehler++;
     }
   }
@@ -2400,43 +2815,675 @@ async function executeAll() {
   var steps = [];
   var errors = [];
 
-  // 1. Mail verschieben (wenn Ordner eingegeben und nicht "sofort"/"erledigen")
-  var folderName = document.getElementById('folder-input').value.trim();
-  if (folderName && state.aktion !== 'sofort' && state.aktion !== 'erledigen') {
-    steps.push('Mail verschieben');
-    try {
-      await moveMailToFolder();
-    } catch(e) { errors.push('Mail verschieben: ' + e.message); }
-  }
+  // REIHENFOLGE KRITISCH: Zuerst alles was die Mail-Referenz braucht,
+  // DANN erst verschieben (Verschieben gibt der Mail eine neue ID!)
 
-  // 2. Anhaenge hochladen (wenn vorhanden)
+  // 1. Anhaenge in OneDrive hochladen (braucht Zugriff auf Mail-Anhaenge via alte ID)
   if (state.attachments.length > 0) {
     steps.push('Anhaenge ablegen');
     try { await uploadAllAttachments(); } catch(e) { errors.push('Upload: ' + e.message); }
   }
 
-  // 3. Antwort in Outlook oeffnen (wenn Toggle an und Text vorhanden) – NIE automatisch senden
-  if (state.replyNeeded && document.getElementById('reply-text').value.trim()) {
-    steps.push('Antwort oeffnen');
-    try { openReplyInOutlook('replyAll'); } catch(e) { errors.push('Antwort oeffnen: ' + e.message); }
-  }
-
-  // 4. Aufgaben in Microsoft To Do erstellen (wenn vorhanden)
-  var taskItems = document.querySelectorAll('.task-item');
-  if (taskItems.length > 0) {
+  // 2. Aufgaben in Microsoft To Do erstellen (nur unerledigte)
+  if (state.tasks.filter(function(t) { return !t.done; }).length > 0) {
     steps.push('To Do erstellen');
     try { await createTodosInMicrosoft(); } catch(e) { errors.push('To Do: ' + e.message); }
   }
 
-  // 5. Feedback speichern (Toggle-Status verwenden)
+  // 3. Antwort in Outlook oeffnen (VOR Mail-Verschiebung – braucht item-Referenz)
+  // Antwort oeffnen wenn Text vorhanden – egal ob Toggle an oder aus
+  // (Toggle steuert nur ob KI einen Entwurf generiert, nicht ob vorhandener Text geoeffnet wird)
+  var replyText = document.getElementById('reply-text').value.trim();
+  if (replyText) {
+    steps.push('Antwort oeffnen');
+    try { await openReplyInOutlook(); } catch(e) { errors.push('Antwort: ' + e.message); }
+  }
+
+  // 4. Mail verschieben/loeschen (ZULETZT – aendert die Mail-ID!)
+  // Verschieben wenn: Ordner eingegeben UND nicht leer/Posteingang
+  // Auch bei "sofort"/"erledigen" verschieben, wenn Ole explizit einen Ordner gewaehlt hat
+  var folderName = document.getElementById('folder-input').value.trim();
+  var skipMove = !folderName || folderName === 'Posteingang' || folderName === 'Inbox';
+  if (!skipMove) {
+    if (state.aktion === 'loeschen') {
+      steps.push('Mail loeschen');
+      try { await deleteMailAndOptionalBlock(); } catch(e) { errors.push('Loeschen: ' + e.message); }
+    } else {
+      steps.push('Mail verschieben');
+      try { await moveMailToFolder(); } catch(e) { errors.push('Mail verschieben: ' + e.message); }
+    }
+  }
+
+  // 5. Feedback speichern
   var fbCorrect = document.getElementById('fb-correct-toggle').checked;
   var fbText = document.getElementById('fb-text').value.trim();
   saveFeedbackToStorage(fbCorrect, fbText);
+
+  // 6. Kompletten Vorgang dokumentieren (KI-Analyse + Oles Entscheidungen + Aktionen)
+  saveAnalysisLog(steps);
 
   if (errors.length === 0) {
     showToast('Alles erledigt! (' + steps.join(', ') + ')', 'success');
   } else {
     showToast('Teilweise erledigt. Fehler: ' + errors.join('; '), 'error');
+  }
+}
+
+/* ========== KI FRAGEN (Chat mit Thread-Kontext) ========== */
+
+// E-Mail-Thread + weitere Mails vom Absender laden via Graph API
+async function loadEmailThread() {
+  if (state.threadLoaded) return state.threadMails;
+  if (!state.graphToken || !state.restMailId) return null;
+
+  try {
+    var allMails = [];
+    var seenIds = {};
+
+    // 1. conversationId der aktuellen Mail holen
+    var msgRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '?$select=conversationId');
+    if (msgRes && msgRes.ok) {
+      var msgData = await msgRes.json();
+      var convId = msgData.conversationId;
+
+      if (convId) {
+        // 2. Alle Mails im selben Thread laden
+        var threadRes = await graphFetch("https://graph.microsoft.com/v1.0/me/messages?$filter=conversationId eq '" + convId + "'&$orderby=receivedDateTime asc&$top=25&$select=id,subject,from,receivedDateTime,body,hasAttachments");
+        if (threadRes && threadRes.ok) {
+          var threadData = await threadRes.json();
+          (threadData.value || []).forEach(function(m) {
+            if (!seenIds[m.id]) { allMails.push(m); seenIds[m.id] = true; }
+          });
+        }
+      }
+    }
+    console.log('[Chat] Thread: ' + allMails.length + ' Mails');
+
+    // 3. ZUSAETZLICH: Weitere Mails vom selben Absender suchen (fuer Anhaenge aus frueheren Mails)
+    if (state.fromEmail) {
+      try {
+        var senderRes = await graphFetch("https://graph.microsoft.com/v1.0/me/messages?$filter=from/emailAddress/address eq '" + state.fromEmail + "' and hasAttachments eq true&$orderby=receivedDateTime desc&$top=10&$select=id,subject,from,receivedDateTime,body,hasAttachments");
+        if (senderRes && senderRes.ok) {
+          var senderData = await senderRes.json();
+          var extraCount = 0;
+          (senderData.value || []).forEach(function(m) {
+            if (!seenIds[m.id]) {
+              allMails.push(m);
+              seenIds[m.id] = true;
+              extraCount++;
+            }
+          });
+          if (extraCount > 0) {
+            console.log('[Chat] + ' + extraCount + ' weitere Mails von ' + state.fromEmail + ' mit Anhaengen gefunden');
+          }
+        }
+      } catch(e) { console.warn('[Chat] Absender-Suche fehlgeschlagen:', e); }
+    }
+
+    // Chronologisch sortieren
+    allMails.sort(function(a, b) { return new Date(a.receivedDateTime) - new Date(b.receivedDateTime); });
+
+    state.threadMails = allMails;
+
+    // Thread-Info anzeigen
+    var info = document.getElementById('chat-thread-info');
+    var threadCount = allMails.length;
+    var withAtt = allMails.filter(function(m) { return m.hasAttachments; }).length;
+    info.textContent = threadCount + ' Mails geladen' + (withAtt > 0 ? ', ' + withAtt + ' mit Anhaengen' : '');
+
+    state.threadLoaded = true;
+    return state.threadMails;
+  } catch(e) {
+    console.error('[Chat] Thread laden Fehler:', e);
+    return null;
+  }
+}
+
+// Anhaenge aus dem gesamten Thread laden (PDFs, Bilder, Word etc.)
+async function loadThreadAttachments() {
+  if (state.threadAttachments) return state.threadAttachments;
+  if (!state.threadMails) return [];
+
+  var attachments = [];
+  var mailsWithAtt = state.threadMails.filter(function(m) { return m.hasAttachments; });
+  console.log('[Chat] ' + mailsWithAtt.length + ' Mails im Thread haben Anhaenge');
+
+  for (var i = 0; i < mailsWithAtt.length; i++) {
+    try {
+      // Anhang-Liste laden
+      var attRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + mailsWithAtt[i].id + '/attachments?$select=id,name,contentType,size,isInline');
+      if (!attRes || !attRes.ok) continue;
+      var attData = await attRes.json();
+      var atts = (attData.value || []).filter(function(a) { return !a.isInline; });
+
+      for (var j = 0; j < atts.length; j++) {
+        var att = atts[j];
+        var sizeKB = Math.round((att.size || 0) / 1024);
+
+        if (att.size > 5 * 1024 * 1024) {
+          // Zu gross fuer Claude – nur als Info
+          attachments.push({ name: att.name, contentType: att.contentType, contentBytes: null, size: att.size, fromMail: mailsWithAtt[i].subject });
+          console.log('[Chat] Anhang zu gross: ' + att.name + ' (' + sizeKB + ' KB)');
+          continue;
+        }
+
+        // Jeden Anhang EINZELN laden (contentBytes ist in der Liste oft nicht enthalten!)
+        try {
+          var singleRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + mailsWithAtt[i].id + '/attachments/' + att.id);
+          if (singleRes && singleRes.ok) {
+            var singleData = await singleRes.json();
+            if (singleData.contentBytes) {
+              attachments.push({
+                name: att.name,
+                contentType: att.contentType,
+                contentBytes: singleData.contentBytes,
+                size: att.size,
+                fromMail: mailsWithAtt[i].subject
+              });
+              console.log('[Chat] Anhang geladen: ' + att.name + ' (' + sizeKB + ' KB, ' + att.contentType + ')');
+            } else {
+              attachments.push({ name: att.name, contentType: att.contentType, contentBytes: null, size: att.size, fromMail: mailsWithAtt[i].subject });
+              console.log('[Chat] Anhang ohne contentBytes: ' + att.name);
+            }
+          }
+        } catch(e2) {
+          console.warn('[Chat] Einzelner Anhang fehlgeschlagen:', att.name, e2);
+          attachments.push({ name: att.name, contentType: att.contentType, contentBytes: null, size: att.size, fromMail: mailsWithAtt[i].subject });
+        }
+      }
+    } catch(e) { console.warn('[Chat] Anhang laden Fehler:', e); }
+  }
+
+  state.threadAttachments = attachments;
+  var loaded = attachments.filter(function(a) { return a.contentBytes; }).length;
+  console.log('[Chat] ' + attachments.length + ' Anhaenge gefunden, ' + loaded + ' mit Inhalt geladen');
+
+  // Thread-Info aktualisieren
+  var info = document.getElementById('chat-thread-info');
+  var threadCount = state.threadMails ? state.threadMails.length : 0;
+  info.textContent = 'Thread: ' + threadCount + ' Mails, ' + loaded + ' Dokumente geladen';
+
+  return attachments;
+}
+
+// Thread-Kontext als Text aufbereiten
+function buildThreadContext() {
+  if (!state.threadMails || state.threadMails.length === 0) {
+    // Fallback: nur aktuelle Mail
+    return 'Von: ' + state.from + ' <' + state.fromEmail + '>\n'
+      + 'Betreff: ' + state.subject + '\n\n'
+      + (state.body || '').substring(0, 5000);
+  }
+
+  var lines = [];
+  state.threadMails.forEach(function(m, i) {
+    var von = m.from ? (m.from.emailAddress.name + ' <' + m.from.emailAddress.address + '>') : 'Unbekannt';
+    var datum = m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : '';
+    lines.push('--- Mail ' + (i + 1) + '/' + state.threadMails.length + ' (' + datum + ') ---');
+    lines.push('Von: ' + von);
+    lines.push('Betreff: ' + (m.subject || ''));
+    // Body: HTML zu Text vereinfachen
+    var bodyText = m.body ? (m.body.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    lines.push(bodyText.substring(0, 3000));
+    lines.push('');
+  });
+
+  // Anhang-Info
+  if (state.threadAttachments && state.threadAttachments.length > 0) {
+    lines.push('--- Anhaenge im Thread ---');
+    state.threadAttachments.forEach(function(a) {
+      var status = a.contentBytes ? '(wird mitgesendet)' : '(zu gross, nur Info)';
+      lines.push('- ' + a.name + ' (' + Math.round(a.size / 1024) + ' KB) ' + status + ' [aus: ' + a.fromMail + ']');
+    });
+  }
+
+  return lines.join('\n');
+}
+
+// Tool-Definitionen fuer Claude (Mail-Suche)
+var chatTools = [
+  {
+    name: 'search_emails',
+    description: 'Durchsucht Oles Outlook-Postfach nach E-Mails. Nutze dieses Tool wenn Ole nach Informationen aus anderen E-Mails fragt, z.B. Bewerbungsunterlagen, Vertraege, fruehere Korrespondenz. Du kannst nach Stichworten suchen und optional einen Ordner angeben.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Suchbegriffe (z.B. "Lebenslauf Anna Mueller", "Rechnung Helios", "Vertrag Qodia")' },
+        folder: { type: 'string', description: 'Optional: Outlook-Ordnername zum Eingrenzen (z.B. "Personal / Bewerbungen", "Finanzbuchhaltung"). Leer lassen fuer Suche in allen Ordnern.' }
+      },
+      required: ['query']
+    }
+  }
+];
+
+// Mail-Suche via Graph API ausfuehren (wird von Claude als Tool aufgerufen)
+async function executeSearchEmails(query, folderName) {
+  if (!state.graphToken) return { error: 'Nicht mit Microsoft verbunden' };
+
+  console.log('[Chat Tool] Suche: "' + query + '"' + (folderName ? ' in ' + folderName : ''));
+  state.chatMessages[state.chatMessages.length - 1].content = 'Suche nach "' + query + '"...';
+  renderChatMessages();
+
+  try {
+    // URL aufbauen: mit oder ohne Ordner-Filter
+    var searchUrl;
+    if (folderName) {
+      var folderId = outlookFolderMap[folderName];
+      // Teilname-Suche (wie bei moveMailToFolder)
+      if (!folderId) {
+        var folderLower = folderName.toLowerCase();
+        Object.keys(outlookFolderMap).forEach(function(k) {
+          var parts = k.split(' / ');
+          if (parts[parts.length - 1].toLowerCase() === folderLower && outlookFolderMap[k]) {
+            folderId = outlookFolderMap[k];
+          }
+        });
+      }
+      if (folderId) {
+        searchUrl = "https://graph.microsoft.com/v1.0/me/mailFolders/" + folderId + "/messages?$search=\"" + encodeURIComponent(query) + "\"&$top=10&$select=id,subject,from,receivedDateTime,bodyPreview,hasAttachments";
+      } else {
+        searchUrl = "https://graph.microsoft.com/v1.0/me/messages?$search=\"" + encodeURIComponent(query) + "\"&$top=10&$select=id,subject,from,receivedDateTime,bodyPreview,hasAttachments";
+      }
+    } else {
+      searchUrl = "https://graph.microsoft.com/v1.0/me/messages?$search=\"" + encodeURIComponent(query) + "\"&$top=10&$select=id,subject,from,receivedDateTime,bodyPreview,hasAttachments";
+    }
+
+    var res = await graphFetch(searchUrl);
+    if (!res || !res.ok) return { error: 'Suche fehlgeschlagen (HTTP ' + (res ? res.status : 'null') + ')' };
+    var data = await res.json();
+    var mails = data.value || [];
+
+    if (mails.length === 0) return { ergebnis: 'Keine Mails gefunden fuer "' + query + '"' };
+
+    // Ergebnisse aufbereiten + Anhaenge laden
+    var results = [];
+    var newAttachments = [];
+    for (var i = 0; i < mails.length; i++) {
+      var m = mails[i];
+      var von = m.from ? (m.from.emailAddress.name + ' <' + m.from.emailAddress.address + '>') : 'Unbekannt';
+      var result = { betreff: m.subject, von: von, datum: m.receivedDateTime, vorschau: m.bodyPreview };
+
+      // Anhaenge dieser Mail laden
+      if (m.hasAttachments) {
+        var attRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + m.id + '/attachments?$select=id,name,contentType,size,isInline');
+        if (attRes && attRes.ok) {
+          var attData = await attRes.json();
+          var atts = (attData.value || []).filter(function(a) { return !a.isInline && a.size <= 5 * 1024 * 1024; });
+          result.anhaenge = atts.map(function(a) { return a.name + ' (' + Math.round(a.size / 1024) + ' KB)'; });
+
+          // Jeden Anhang einzeln laden fuer Claude
+          for (var j = 0; j < atts.length; j++) {
+            try {
+              var singleRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + m.id + '/attachments/' + atts[j].id);
+              if (singleRes && singleRes.ok) {
+                var singleData = await singleRes.json();
+                if (singleData.contentBytes) {
+                  newAttachments.push({
+                    name: atts[j].name,
+                    contentType: atts[j].contentType,
+                    contentBytes: singleData.contentBytes,
+                    size: atts[j].size,
+                    fromMail: m.subject
+                  });
+                }
+              }
+            } catch(e) {}
+          }
+        }
+      }
+      results.push(result);
+    }
+
+    // Neue Anhaenge zum State hinzufuegen
+    if (newAttachments.length > 0) {
+      if (!state.threadAttachments) state.threadAttachments = [];
+      newAttachments.forEach(function(a) { state.threadAttachments.push(a); });
+      console.log('[Chat Tool] ' + newAttachments.length + ' neue Anhaenge geladen');
+    }
+
+    return { gefunden: mails.length + ' Mails', ergebnisse: results, anhaenge_geladen: newAttachments.length };
+  } catch(e) {
+    return { error: 'Suche fehlgeschlagen: ' + e.message };
+  }
+}
+
+// Anhaenge als Content-Blocks fuer Claude aufbereiten
+function buildAttachmentBlocks() {
+  var blocks = [];
+  if (!state.threadAttachments) return blocks;
+  state.threadAttachments.forEach(function(att) {
+    if (!att.contentBytes) return;
+    var mediaType = (att.contentType || '').toLowerCase();
+    if (mediaType.indexOf('pdf') !== -1) {
+      blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: att.contentBytes }, title: att.name + ' (aus: ' + att.fromMail + ')' });
+    } else if (mediaType.indexOf('image/') !== -1) {
+      blocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: att.contentBytes } });
+    } else if (mediaType.indexOf('word') !== -1 || mediaType.indexOf('document') !== -1 || mediaType.indexOf('text/') !== -1 || mediaType.indexOf('csv') !== -1 || mediaType.indexOf('spreadsheet') !== -1 || mediaType.indexOf('excel') !== -1) {
+      blocks.push({ type: 'document', source: { type: 'base64', media_type: att.contentType, data: att.contentBytes }, title: att.name + ' (aus: ' + att.fromMail + ')' });
+    }
+  });
+  return blocks;
+}
+
+// Chat-Nachricht an Claude senden (Multi-Turn mit Tool Use)
+async function askKI() {
+  var input = document.getElementById('chat-input');
+  var question = input.value.trim();
+  if (!question) return;
+
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
+
+  // Frage in Chat eintragen + UI aktualisieren
+  state.chatMessages.push({ role: 'user', content: question });
+  input.value = '';
+  renderChatMessages();
+
+  // Beim ersten Mal: Thread + Anhaenge laden
+  if (!state.threadLoaded) {
+    document.getElementById('chat-thread-info').textContent = 'Thread wird geladen...';
+    await loadEmailThread();
+    await loadThreadAttachments();
+  }
+
+  // Gedaechtnis-Kontext
+  var gedaechtnisContext = '';
+  if (gedaechtnis.profil) gedaechtnisContext += 'PROFIL:\n' + gedaechtnis.profil + '\n\n';
+
+  // Thread-Kontext
+  var threadContext = buildThreadContext();
+
+  // Claude API Messages aufbauen
+  var messages = [];
+
+  // Erste Nachricht: System-Kontext + Anhaenge + erste Frage
+  var firstUserContent = [];
+  firstUserContent.push({
+    type: 'text',
+    text: 'Du bist der persoenliche KI-Sparringspartner von Ole Reinpold (Prokurist, Elbe Hernien Centrum EHC GmbH, Hamburg). '
+      + 'Ole will NICHT dass du ihm nach dem Mund redest. Er erwartet:\n'
+      + '- Challenge seine Ideen und Einschaetzungen aktiv\n'
+      + '- Gib ehrliche, auch unangenehme Einschaetzungen\n'
+      + '- Weise auf Risiken, Schwaechen und blinde Flecken hin\n'
+      + '- Wenn du anderer Meinung bist, sag es klar und begruende es\n'
+      + '- Sei kein Ja-Sager. Ole will einen echten Sparringspartner\n'
+      + '- Sei dabei trotzdem respektvoll und konstruktiv\n\n'
+      + 'Ole hat eine Frage zu einer E-Mail. Hier ist der Kontext:\n\n'
+      + gedaechtnisContext
+      + '=== E-MAIL-VERLAUF ===\n' + threadContext + '\n\n'
+      + '=== KI-ANALYSE (falls vorhanden) ===\n'
+      + (state.analysis ? JSON.stringify(state.analysis, null, 2) : 'Noch nicht analysiert') + '\n\n'
+      + 'Antworte auf Deutsch, praezise und substanziell. '
+      + 'Wenn du Dokumente brauchst die nicht im Thread sind (z.B. Lebenslauf aus einer Stepstone-Mail, Vertrag aus einer alten Mail), nutze das search_emails Tool um danach zu suchen. '
+      + 'Wenn du Anhaenge analysieren sollst, beziehe dich auf die mitgesendeten Dokumente.'
+  });
+
+  // Vorhandene Anhaenge mitschicken
+  var attBlocks = buildAttachmentBlocks();
+  attBlocks.forEach(function(block) { firstUserContent.push(block); });
+  if (attBlocks.length > 0) {
+    firstUserContent.push({ type: 'text', text: '(' + attBlocks.length + ' Dokumente aus dem Thread mitgesendet)' });
+  }
+
+  // Erste Frage
+  firstUserContent.push({ type: 'text', text: state.chatMessages[0].content });
+  messages.push({ role: 'user', content: firstUserContent });
+
+  // Weitere Nachrichten (ab der zweiten)
+  for (var i = 1; i < state.chatMessages.length; i++) {
+    var msg = state.chatMessages[i];
+    messages.push({ role: msg.role, content: msg.content });
+  }
+
+  // Lade-Anzeige
+  state.chatMessages.push({ role: 'assistant', content: '...' });
+  renderChatMessages();
+
+  try {
+    // API-Call mit Tool-Definitionen
+    var apiResponse = await callClaudeWithTools(claudeKey, messages, 3); // max 3 Tool-Runden
+
+    // Lade-Platzhalter ersetzen
+    state.chatMessages[state.chatMessages.length - 1].content = apiResponse;
+    renderChatMessages();
+
+    // Chat-Verlauf auf Festplatte speichern
+    saveChatToServer();
+
+    // "Antwort daraus formulieren" Button zeigen
+    document.getElementById('chat-reply-btn').style.display = 'flex';
+
+  } catch(e) {
+    console.error('[Chat] Fehler:', e);
+    state.chatMessages[state.chatMessages.length - 1].content = 'Fehler: ' + e.message;
+    renderChatMessages();
+  }
+}
+
+// Claude API mit Tool Use aufrufen (mit automatischer Tool-Ausfuehrung)
+async function callClaudeWithTools(claudeKey, messages, maxRounds) {
+  var knownAttCount = state.threadAttachments ? state.threadAttachments.filter(function(a) { return a.contentBytes; }).length : 0;
+  for (var round = 0; round < maxRounds; round++) {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        tools: chatTools,
+        messages: messages
+      })
+    });
+
+    if (!response.ok) {
+      var errText = await response.text();
+      throw new Error('API Fehler ' + response.status + ': ' + errText.substring(0, 200));
+    }
+
+    var data = await response.json();
+
+    // Pruefen ob Claude ein Tool aufrufen will
+    if (data.stop_reason === 'tool_use') {
+      // Tool-Aufrufe finden und ausfuehren
+      var assistantContent = data.content;
+      messages.push({ role: 'assistant', content: assistantContent });
+
+      var toolResults = [];
+      for (var t = 0; t < assistantContent.length; t++) {
+        var block = assistantContent[t];
+        if (block.type === 'tool_use') {
+          console.log('[Chat] Tool aufgerufen: ' + block.name + '(' + JSON.stringify(block.input) + ')');
+
+          // Chat-Status aktualisieren
+          state.chatMessages[state.chatMessages.length - 1].content = 'Suche in Outlook: "' + (block.input.query || '') + '"...';
+          renderChatMessages();
+
+          var result = {};
+          if (block.name === 'search_emails') {
+            result = await executeSearchEmails(block.input.query, block.input.folder || '');
+          } else {
+            result = { error: 'Unbekanntes Tool: ' + block.name };
+          }
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content: JSON.stringify(result)
+          });
+
+          // Anhaenge werden weiter unten als Content-Blocks in die toolResultMsg eingefuegt
+        }
+      }
+
+      // Tool-Ergebnisse zurueckschicken
+      var toolResultMsg = { role: 'user', content: toolResults };
+
+      // Neu geladene Dokumente als Content-Blocks hinzufuegen
+      var newAttBlocks = buildAttachmentBlocks();
+      if (newAttBlocks.length > knownAttCount) {
+        var addedBlocks = newAttBlocks.slice(knownAttCount);
+        addedBlocks.forEach(function(block) { toolResultMsg.content.push(block); });
+        toolResultMsg.content.push({ type: 'text', text: '(' + addedBlocks.length + ' neue Dokumente aus der Suche geladen. Du kannst sie jetzt lesen.)' });
+        knownAttCount = newAttBlocks.length;
+      }
+
+      messages.push(toolResultMsg);
+      continue; // Naechste Runde – Claude bekommt die Tool-Ergebnisse
+
+    } else {
+      // Normale Antwort (kein Tool) – fertig
+      var textParts = data.content.filter(function(b) { return b.type === 'text'; });
+      return textParts.map(function(b) { return b.text; }).join('\n');
+    }
+  }
+
+  return '(Maximale Anzahl an Suchen erreicht)';
+}
+
+// Chat Vollbild oeffnen/schliessen
+function openChatFullscreen() {
+  document.getElementById('sec-chat').classList.add('chat-fullscreen');
+  document.getElementById('sec-chat').classList.remove('collapsed');
+}
+
+function closeChatFullscreen() {
+  document.getElementById('sec-chat').classList.remove('chat-fullscreen');
+}
+
+// Chat-Verlauf auf Festplatte speichern (letzte 5 Gespraeche, rotierend)
+async function saveChatToServer() {
+  try {
+    // Aktuellen Chat als Eintrag aufbereiten
+    var chatEntry = {
+      datum: new Date().toISOString(),
+      mailId: state.mailId || 'unbekannt',
+      betreff: state.mailSubject || 'unbekannt',
+      absender: state.mailFrom || 'unbekannt',
+      nachrichten: state.chatMessages.map(function(m) {
+        return { rolle: m.role === 'user' ? 'Ole' : 'KI', text: m.content };
+      })
+    };
+
+    // Bisheriges Chat-Log vom Server laden
+    var chatLog = [];
+    try {
+      var resp = await fetch('/gedaechtnis/feedback/chat_log.json');
+      if (resp.ok) chatLog = await resp.json();
+    } catch(e) { /* Datei existiert noch nicht */ }
+
+    // Pruefen ob schon ein Eintrag fuer diese Mail existiert → aktualisieren
+    var existingIdx = chatLog.findIndex(function(c) { return c.mailId === chatEntry.mailId; });
+    if (existingIdx >= 0) {
+      chatLog[existingIdx] = chatEntry;
+    } else {
+      chatLog.push(chatEntry);
+    }
+
+    // Nur letzte 10 Gespraeche behalten
+    if (chatLog.length > 10) chatLog = chatLog.slice(-10);
+
+    // An Server schicken
+    await fetch('/api/gedaechtnis/feedback/chat_log.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(chatLog, null, 2)
+    });
+    console.log('[Chat] Verlauf gespeichert (' + chatLog.length + ' Gespraeche)');
+  } catch(e) {
+    console.warn('[Chat] Speichern fehlgeschlagen:', e.message);
+  }
+}
+
+// Chat-Section: Im Vollbild → minimieren, sonst → toggle
+function toggleChatSection() {
+  var sec = document.getElementById('sec-chat');
+  if (sec.classList.contains('chat-fullscreen')) {
+    closeChatFullscreen();
+  } else {
+    sec.classList.toggle('collapsed');
+  }
+}
+
+// Chat-Nachrichten rendern
+function renderChatMessages() {
+  var container = document.getElementById('chat-messages');
+  container.style.display = 'block';
+  container.innerHTML = '';
+
+  state.chatMessages.forEach(function(msg) {
+    var div = document.createElement('div');
+    div.className = 'chat-msg ' + msg.role;
+    var label = msg.role === 'user' ? 'Ole' : 'KI';
+    div.innerHTML = '<div class="chat-label">' + label + '</div>' + msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    container.appendChild(div);
+  });
+
+  // Nach unten scrollen
+  container.scrollTop = container.scrollHeight;
+}
+
+// Aus dem Chat-Verlauf eine Antwort generieren (mit vollem Gedaechtnis + Thread)
+async function generateReplyFromChat() {
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
+
+  // Chat-Zusammenfassung
+  var chatSummary = state.chatMessages.map(function(m) {
+    return (m.role === 'user' ? 'Ole' : 'KI') + ': ' + m.content;
+  }).join('\n\n');
+
+  // Volles Gedaechtnis einbeziehen
+  var context = '';
+  if (gedaechtnis.profil) context += '=== PROFIL ===\n' + gedaechtnis.profil + '\n\n';
+  if (gedaechtnis.antwortRegeln) context += '=== ANTWORT-STIL ===\n' + JSON.stringify(gedaechtnis.antwortRegeln.antwort_stil, null, 2) + '\n\n';
+  if (gedaechtnis.feedback) context += '=== FEEDBACK ===\n' + gedaechtnis.feedback + '\n\n';
+
+  // Thread-Kontext
+  var threadContext = buildThreadContext();
+
+  document.getElementById('reply-text').value = 'Antwort wird aus Chat generiert...';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: 'Du schreibst als Ole Reinpold eine Antwort-Mail.\n\n'
+          + context
+          + '=== E-MAIL-VERLAUF ===\n' + threadContext + '\n\n'
+          + '=== DISKUSSION MIT OLE (Oles Wuensche beruecksichtigen!) ===\n' + chatSummary + '\n\n'
+          + 'Schreibe die Antwort-Mail basierend auf der Diskussion mit Ole. '
+          + 'Beruecksichtige Oles Anweisungen aus dem Chat. '
+          + 'Schreibe NUR die Antwort, keine Erklaerung. Beginne direkt mit der Anrede. Keine Signatur.' }]
+      })
+    });
+
+    var data = await response.json();
+    var reply = data.content[0].text;
+    state.replyText = reply;
+    document.getElementById('reply-text').value = reply;
+    // Toggle an und Antwort-Bereich sichtbar machen
+    state.replyNeeded = true;
+    document.getElementById('reply-toggle').checked = true;
+    document.getElementById('reply-label').textContent = 'Antwort noetig';
+    document.getElementById('reply-area').style.display = 'block';
+    // Chat minimieren damit man die Antwort sieht
+    closeChatFullscreen();
+    showToast('Antwort aus Chat generiert', 'success');
+  } catch(e) {
+    document.getElementById('reply-text').value = 'Fehler: ' + e.message;
   }
 }
 

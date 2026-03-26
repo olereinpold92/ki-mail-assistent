@@ -58,11 +58,19 @@ Es nutzt ein lokales "Gedaechtnis" (Textdateien) das der KI bei jeder Analyse mi
 
 ## Architektur: Outlook Add-in
 - Outlook Add-in (Seitenleiste) statt eigener Web-App
-- Alles in EINER taskpane.html (HTML + CSS + JS, ~2500 Zeilen)
-- Lokaler HTTPS-Server (Python, Port 3000)
+- Alles in EINER taskpane.html (HTML + CSS + JS, ~3300 Zeilen)
+- Lokaler HTTPS-Server (Python, Port 3000) – kann lesen UND schreiben
 - MSAL.js lokal eingebunden (nicht ueber CDN)
 - manifest.xml fuer Outlook Sideloading
-- Gedaechtnis-System: Textdateien unter /gedaechtnis/
+- Gedaechtnis-System: Tag-basierte entries.json + Textdateien unter /gedaechtnis/
+- KI-Chat: Diskussion mit KI ueber Mails, inkl. Dokumenten-Suche via Tool Use
+
+## Gedaechtnis-Architektur (entschieden 26.03.2026)
+Zwei strikt getrennte Ebenen:
+- **Systemverhalten** (WIE die KI arbeitet): Fest im Prompt, aendert sich nur bewusst
+- **Gelerntes Wissen** (WAS Ole wichtig ist): In entries.json, waechst automatisch
+Gelerntes Wissen wird per **Tag-Matching** selektiv geladen (nicht alles bei jeder Mail).
+Details: Siehe KONZEPT.md Abschnitt 5.
 
 ## Azure Konfiguration
 - Client ID: aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0

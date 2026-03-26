@@ -136,55 +136,137 @@ Power Automate koennte spaeter fuer Routine-Mails im Hintergrund laufen (Rechnun
 ### Grundprinzip
 Claude "lernt" nicht im klassischen Sinne (keine Gewichts-Aenderung). Stattdessen:
 - Wir bauen ein **strukturiertes Gedaechtnis** aus Textdateien
-- Bei jeder Mail-Analyse werden relevante Gedaechtnis-Dateien als Kontext mitgeschickt
+- Bei jeder Mail-Analyse werden **nur relevante** Gedaechtnis-Eintraege als Kontext mitgeschickt
 - Je besser das Gedaechtnis, desto "schlauer" wirkt die KI
-- Nicht die KI wird klüger, sondern **die Akte ueber Ole wird besser**
+- Nicht die KI wird klueger, sondern **die Akte ueber Ole wird besser**
 
-### Gedaechtnis-Struktur
+### Architektur-Grundsatz: Zwei getrennte Ebenen (entschieden 26.03.2026)
+
+Das Gedaechtnis hat zwei strikt getrennte Ebenen die NICHT vermischt werden duerfen:
+
+**Ebene A – Systemverhalten (WIE die KI arbeitet)**
+- Fest im System-Prompt verankert, nicht in lernenden Dateien
+- Aendert sich nur wenn Ole und Claude Code es bewusst entscheiden
+- Beispiele: "Erst Kontext sammeln, dann bewerten", "Position halten wenn fundiert",
+  "Nachfragen statt raten", "Fakten und Fragen vor Meinungen"
+- Wird NICHT aus Feedback automatisch geaendert
+
+**Ebene B – Gelerntes Wissen (WAS Ole wichtig ist)**
+- In Gedaechtnis-Dateien, waechst automatisch durch Feedback
+- Wird per Tag-Matching selektiv geladen (nur was relevant ist)
+- Beispiele: "ATOS-Rechnungen → Firmen & Organisationen",
+  "Bei Bewerbern ist Eigenmotivation wichtig", "Scan AG Rechnungen → 03_Finanzen"
+
+### Gedaechtnis-Architektur: Tag-basiert statt Hierarchie (entschieden 26.03.2026)
+
+**Problem mit der alten Ordner-Hierarchie:**
+- Starre Kategorien (profil/, regeln/, kontakte/) skalieren nicht
+- Wissen das mehrere Bereiche betrifft laesst sich nicht sauber einordnen
+- "Alles laden" verschwendet Tokens bei irrelevanten Details
+- "Bei Bedarf laden" hat keine Entscheidungslogik
+
+**Neuer Ansatz: Flache Eintraege mit Tags**
+
+Jedes Stueck gelerntes Wissen ist EIN Eintrag mit mehreren Tags.
+Kein Eintrag sitzt in einer festen Schublade – er kann zu mehreren Themen gehoeren.
+
 ```
 /gedaechtnis/
-├── _config.json              ← Welche Kategorien gibt es, was wird geladen
+├── entries.json              ← HAUPTDATEI: Alle gelernten Wissens-Eintraege mit Tags
 ├── profil/
-│   ├── grundprofil.md        ← Wer ist Ole, Rollen, Ziele, Arbeitsweise
-│   ├── kommunikationsstil.md ← (noch zu erstellen) Wie Ole schreibt
-│   ├── entscheidungsmuster.md← (noch zu erstellen) Wie Ole priorisiert
-│   └── psychologisches_profil.md ← (spaeter) Staerken, Schwaechen, Tendenzen
+│   └── grundprofil.md        ← Oles Grundprofil (immer geladen, Ebene A)
+├── feedback/
+│   ├── feedback_log.json     ← Rohes Feedback (chronologisch, fuer Auswertung)
+│   ├── analysis_log.json     ← Bearbeitungs-Protokoll (KI-Vorschlag + Oles Entscheidung)
+│   └── chat_log.json         ← Letzte 10 Chat-Gespraeche (rotierend)
 ├── regeln/
-│   ├── ordner.json           ← Outlook-Ordner + Zuordnungsregeln
-│   ├── anhaenge.json         ← OneDrive-Ordner + Dateinamen-Regeln
-│   └── antworten.json        ← Antwort-Stil, Grussformeln, Tonfall
-├── kontakte/                 ← (noch zu befuellen) Bekannte Absender + Kontext
-├── beispiele/
-│   ├── meine_antworten/      ← (noch zu befuellen) Echte Mails von Ole als Referenz
-│   └── korrekturen/          ← (noch zu befuellen) Was KI falsch machte
-└── feedback/
-    ├── feedback_log.json     ← (in localStorage) Chronologisches Feedback
-    └── zusammenfassung.md    ← Verdichtete Erkenntnisse (wird regelmaessig aktualisiert)
+│   └── antworten.json        ← Antwort-Stil (Grussformeln, Tonfall)
+└── archiv/                   ← Veraltete Eintraege (weight < 0.3, >90 Tage nicht genutzt)
 ```
 
-### Drei Ebenen des Lernens
+### entries.json – Das Herzstueck
 
-**Ebene 1: Muster-Erkennung (sofort, ab ~20 Mails)**
-- Mail von ATOS → Ordner "Firmen & Organisationen / ATOS"
-- Rechnung als Anhang → OneDrive/EHC/Eingangsrechnungen
-- Stepstone-Mail → "Nice to have", keine Antwort noetig
-- Funktioniert ueber Regeln in ordner.json die durch Feedback verfeinert werden
+Jeder Eintrag hat diese Struktur:
+```json
+{
+  "id": "r_atos_rechnung_ordner",
+  "text": "Rechnungen von ATOS gehen immer nach Firmen & Organisationen / ATOS",
+  "tags": ["atos", "rechnung", "ordner-zuordnung", "firmen"],
+  "scope": "spezifisch",
+  "weight": 0.9,
+  "use_count": 14,
+  "last_used": "2026-03-26",
+  "learned_from": "feedback_2026-03-20",
+  "summary": "ATOS-Rechnungen → Firmen/ATOS"
+}
+```
 
-**Ebene 2: Stil & Kommunikation (Wochen, ab ~30 Beispiel-Mails)**
-- Wie Ole Mails formuliert (Tonfall, Laenge, Grussformeln)
-- Wann formal vs. informell
-- Welche Formulierungen typisch sind
-- Funktioniert ueber Beispiel-Mails in /beispiele/meine_antworten/
+Felder:
+- **id**: Eindeutiger Bezeichner
+- **text**: Das eigentliche Wissen (vollstaendig, verstaendlich)
+- **tags**: Mehrere Stichworte fuer Retrieval (automatisch von Claude generiert)
+- **scope**: "global" (immer laden) oder "spezifisch" (nur bei Tag-Match)
+- **weight**: 0.0 bis 1.0 – wie sicher/bestaetigt ist dieses Wissen (steigt bei Bestaetigungen, sinkt bei Korrekturen)
+- **use_count**: Wie oft wurde der Eintrag bisher geladen/genutzt
+- **last_used**: Wann zuletzt relevant
+- **learned_from**: Woher das Wissen stammt (Feedback, Chat, manuell)
+- **summary**: Einzeiler fuer schnelles Scannen
 
-**Ebene 3: Strategischer Berater (Monate)**
-- Erkennt Muster in Oles Verhalten
-- Hinterfragt Entscheidungen
-- Kennt Oles Ziele und gleicht Handlungen ab
-- Funktioniert ueber wachsendes Profil in /profil/
+### Retrieval: Nur laden was relevant ist
 
-### Feedback-System (zwei Quellen)
+Bei jeder Mail-Analyse:
+
+1. **Immer laden** (~1.500 Tokens):
+   - Oles Grundprofil (profil/grundprofil.md)
+   - Alle Eintraege mit `scope: "global"`
+
+2. **Tag-Matching** (schnell, kein API-Call):
+   - Aus der Mail Signale extrahieren: Absender-Domain, Betreff-Keywords, Anhangstyp
+   - Tags daraus ableiten (z.B. atos.de → Tag "atos", Betreff "Rechnung" → Tag "rechnung")
+   - Alle Eintraege laden deren Tags matchen
+
+3. **Fallback bei vielen Treffern** (>30 Eintraege):
+   - Nur Summaries an Claude schicken
+   - Claude waehlt die relevanten aus
+   - Dann nur diese voll laden
+
+**Beispiel**: Mail von atos.de mit Betreff "Rechnung Nr. 2026-0512"
+- Extrahierte Tags: ["atos", "rechnung"]
+- Match: Eintrag "ATOS-Rechnungen → Firmen/ATOS" (Tags matchen)
+- KEIN Match: Eintrag "Bei Bewerbern Eigenmotivation wichtig" (kein Tag-Overlap)
+
+### Wie das System lernt
+
+**Aus Feedback (implizit + explizit):**
+1. Ole korrigiert einen Ordner-Vorschlag → Neuer Eintrag oder Bestaetigter Eintrag
+2. Ole gibt Freitext-Feedback → Claude extrahiert daraus Wissen + Tags
+3. Bestehender Eintrag wird bestaetigt → weight steigt
+4. Bestehender Eintrag wird korrigiert → weight sinkt, ggf. neuer Eintrag
+
+**Aus Chat-Gespraechen:**
+- Chat-Verlaeufe werden gespeichert (chat_log.json, letzte 10)
+- Claude Code kann daraus Erkenntnisse ableiten und als Eintraege hinzufuegen
+
+**Verdichtung (regelmaessig):**
+- Nach 10+ aehnlichen Feedbacks zum gleichen Thema → Zusammenfassung zu einer klaren Regel
+- Eintraege mit weight < 0.3 und >90 Tage nicht genutzt → ins Archiv
+- Haelt die entries.json kompakt und relevant
+
+### Skalierung
+
+| Zeitraum | Geschaetzte Eintraege | Retrieval-Methode |
+|----------|----------------------|-------------------|
+| Monat 1 | 10-50 | Tag-Matching, alles passt in Kontext |
+| Monat 3 | 50-200 | Tag-Matching, nur relevante Eintraege laden |
+| Monat 6 | 200-500 | Tag-Matching + Fallback (Summaries) bei vielen Treffern |
+| Jahr 1 | 500-1.000 | Ggf. entries.json nach Domaenen aufteilen |
+
+Kein Vektorspeicher noetig: Bei 1.000 Eintraegen ist der Index ~100KB – Tag-Matching laeuft in Millisekunden.
+
+### Feedback-System (drei Quellen)
 1. **Explizites Feedback**: "Alles 100% korrekt" oder "Nicht korrekt" + Freitext
-2. **Implizites Feedback**: Wenn Ole den Ordner aendert, die Prio korrigiert oder die Antwort umschreibt – das wird als Korrektur gespeichert
+2. **Implizites Feedback**: Wenn Ole den Ordner aendert, die Prio korrigiert oder die Antwort umschreibt
+3. **Chat-Feedback**: Erkenntnisse aus Diskussionen mit der KI (z.B. "Bewerberin war zu oberflaechlich" → Lern-Eintrag)
 
 ### Portabilitaet & Sicherheit
 - Alle Daten liegen lokal auf Oles Rechner
@@ -192,12 +274,7 @@ Claude "lernt" nicht im klassischen Sinne (keine Gewichts-Aenderung). Stattdesse
 - Wenn Ole den KI-Anbieter wechselt (z.B. von Anthropic zu OpenAI), nimmt er den /gedaechtnis/-Ordner mit
 - Kann in Git versioniert werden (Entwicklung des Wissens nachvollziehbar)
 - Keine Cloud-Abhaengigkeit fuer das Gedaechtnis
-
-### Skalierung: Wann brauchen wir RAG?
-- Aktuell: Gedaechtnis passt komplett in Claudes Kontext-Fenster (~20-30 Seiten Text). Kein RAG noetig.
-- Spaeter: Wenn das Gedaechtnis auf hunderte Seiten waechst (z.B. Kalender, Projekte, Buchhaltung), wird RAG noetig.
-- RAG = Retrieval Augmented Generation: KI durchsucht erst die Wissensbasis, liest nur relevante Teile.
-- Die Struktur (Ordner = Kategorien, Dateien = Wissen) ist bereits RAG-kompatibel angelegt.
+- Server.py hat POST-Endpunkt zum Schreiben (nur erlaubte Pfade in Whitelist)
 
 ---
 

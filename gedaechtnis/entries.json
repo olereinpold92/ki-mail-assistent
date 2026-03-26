@@ -1,0 +1,112 @@
+[
+  {
+    "id": "ordner_atos",
+    "text": "Mails von ATOS oder mit ATOS im Betreff gehoeren nach Firmen & Organisationen / ATOS",
+    "tags": ["atos", "ordner-zuordnung", "firmen"],
+    "scope": "spezifisch",
+    "weight": 0.9,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "ATOS → Firmen & Organisationen / ATOS"
+  },
+  {
+    "id": "ordner_helios",
+    "text": "Mails von Helios gehoeren nach Firmen & Organisationen / Helios",
+    "tags": ["helios", "ordner-zuordnung", "firmen"],
+    "scope": "spezifisch",
+    "weight": 0.9,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Helios → Firmen & Organisationen / Helios"
+  },
+  {
+    "id": "ordner_bewerbungen",
+    "text": "Mails von Stepstone, Indeed oder mit 'Bewerbung' im Betreff gehoeren nach Personal / Bewerbungen",
+    "tags": ["stepstone", "indeed", "bewerbung", "personal", "ordner-zuordnung"],
+    "scope": "spezifisch",
+    "weight": 0.8,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Bewerbungen → Personal / Bewerbungen"
+  },
+  {
+    "id": "ordner_rechnungen",
+    "text": "Rechnungen und Mails mit Rechnungsanhaengen gehoeren nach Finanzbuchhaltung",
+    "tags": ["rechnung", "finanzen", "ordner-zuordnung"],
+    "scope": "spezifisch",
+    "weight": 0.7,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Rechnungen → Finanzbuchhaltung"
+  },
+  {
+    "id": "anhang_rechnungen",
+    "text": "Rechnungs-Anhaenge in OneDrive unter EHC / Eingangsrechnungen ablegen. Dateiname: JJMMTT_Organisation_Dateiname.ext",
+    "tags": ["rechnung", "anhang", "onedrive", "finanzen"],
+    "scope": "spezifisch",
+    "weight": 0.8,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Rechnungs-Anhaenge → OneDrive EHC/Eingangsrechnungen"
+  },
+  {
+    "id": "anhang_vertraege",
+    "text": "Vertrags-Anhaenge in OneDrive unter EHC / Vertraege ablegen",
+    "tags": ["vertrag", "anhang", "onedrive"],
+    "scope": "spezifisch",
+    "weight": 0.7,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Vertrags-Anhaenge → OneDrive EHC/Vertraege"
+  },
+  {
+    "id": "anhang_bewerbungen",
+    "text": "Lebenslaeufe und Bewerbungsunterlagen in OneDrive unter EHC / Personal ablegen",
+    "tags": ["bewerbung", "lebenslauf", "personal", "anhang", "onedrive"],
+    "scope": "spezifisch",
+    "weight": 0.8,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Bewerbungs-Anhaenge → OneDrive EHC/Personal"
+  },
+  {
+    "id": "anhang_qodia",
+    "text": "Qodia-bezogene Anhaenge in OneDrive unter Qodia / Allgemein ablegen",
+    "tags": ["qodia", "anhang", "onedrive"],
+    "scope": "spezifisch",
+    "weight": 0.6,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Qodia-Anhaenge → OneDrive Qodia/Allgemein"
+  },
+  {
+    "id": "keine_antwort_rechnungen",
+    "text": "Rechnungen, Newsletter, Infomails ohne Handlungsaufforderung, automatische Benachrichtigungen und Werbung brauchen keine Antwort",
+    "tags": ["rechnung", "newsletter", "werbung", "antwort"],
+    "scope": "spezifisch",
+    "weight": 0.9,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Keine Antwort bei Rechnungen, Newslettern, Werbung"
+  },
+  {
+    "id": "antwort_dateiformat",
+    "text": "OneDrive-Anhaenge immer nach dem Format JJMMTT_Organisation_Dateiname.ext benennen. Beispiel: 260325_Helios_Kliniken_Rechnung_2026-0342.pdf",
+    "tags": ["anhang", "onedrive", "dateiname"],
+    "scope": "global",
+    "weight": 1.0,
+    "use_count": 0,
+    "last_used": null,
+    "learned_from": "initial_setup",
+    "summary": "Dateiname-Format: JJMMTT_Organisation_Dateiname.ext"
+  }
+]

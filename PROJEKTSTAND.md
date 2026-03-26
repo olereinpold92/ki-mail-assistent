@@ -1,4 +1,4 @@
-# KI Mail Assistent – Projektstand (26.03.2026, 16:00 Uhr)
+# KI Mail Assistent – Projektstand (26.03.2026, 20:30 Uhr)
 
 ## STRATEGIEWECHSEL: Outlook Add-in statt Web-App
 Am 25.03.2026 entschieden: Outlook Add-in statt eigener Web-App.
@@ -154,6 +154,23 @@ ki-mail-assistent/
 - Antworten NIE automatisch senden: IMMER nur in Outlook oeffnen
 - Microsoft To Do fuer Aufgaben: ENTSCHIEDEN, parallel zu E-Mail-Ordner-System
 - API-Kostenschutz: Analyse nur manuell, nie automatisch, nie doppelt
+
+## Neue Features (Session 26.03.2026 abends)
+- **KI-Chat**: "KI fragen" Bereich – Fragen zur aktuellen Mail stellen, mit Dokumenten-Suche
+  - Tool Use: KI kann selbststaendig Mails in Outlook-Ordnern durchsuchen
+  - PDF-Analyse: Anhaenge werden direkt an Claude geschickt und gelesen
+  - Vollbild-Modus fuer laengere Diskussionen
+  - "Antwort daraus formulieren" Button: Erstellt Mail-Entwurf basierend auf Chat
+- **Server.py erweitert**: POST-Endpunkt fuer Gedaechtnis-Dateien (Whitelist)
+- **Persistenz**: Feedback, Analysis-Log und Chat-Verlaeufe werden auf Festplatte gespeichert
+- **Chat-Prompt**: KI als Sparringspartner (challengen, nicht nach dem Mund reden)
+
+## Gedaechtnis-Architektur: Umbau auf Tag-System (entschieden 26.03.2026)
+- **Alt**: Ordner-Hierarchie (profil/, regeln/, kontakte/) mit "immer" oder "bei_bedarf"
+- **Neu**: Flache entries.json mit Tags + selektivem Tag-Matching
+- **Zwei Ebenen**: Systemverhalten (fest im Prompt) vs. Gelerntes Wissen (in entries.json)
+- **Details**: Siehe KONZEPT.md Abschnitt 5
+- **Status**: Konzept fertig, Umsetzung begonnen
 
 ## Vision: Persoenlicher KI-Assistent
 - Ebene 1 (jetzt): Muster-Erkennung (Ordner-Zuordnung, Dateinamen, Prios)
