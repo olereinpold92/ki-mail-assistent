@@ -66,7 +66,8 @@
     .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: white; border-radius: 50%; transition: 0.2s; }
     .toggle input:checked + .toggle-slider { background: #0078d4; }
     .toggle input:checked + .toggle-slider:before { left: 18px; }
-    textarea { width: 100%; min-height: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; }
+    textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; transition: min-height 0.2s; }
+    textarea.expanded { min-height: 50vh; }
 
     /* Tasks */
     .task-item { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
@@ -229,11 +230,17 @@
         <span id="reply-label">Keine Antwort noetig</span>
       </div>
       <div id="reply-area" style="display:none">
-        <textarea id="reply-text" placeholder="Antwort wird generiert..."></textarea>
+        <div style="position:relative">
+          <textarea id="reply-text" placeholder="KI-Antwort erscheint hier..." style="min-height:60px"></textarea>
+          <button class="btn btn-outline btn-sm" onclick="toggleReplyExpand()" id="btn-reply-expand" style="position:absolute;top:2px;right:2px;padding:1px 5px;font-size:10px;" title="Erweitern/Verkleinern">&#x2922;</button>
+        </div>
+        <div class="add-task" style="margin-top:4px">
+          <input type="text" id="reply-instruction" placeholder="Anweisung: z.B. 'formeller' oder 'frag nach Termin'" onkeydown="if(event.key==='Enter'){event.preventDefault();refineReply();}">
+          <button class="btn btn-outline btn-sm" onclick="refineReply()" title="KI ueberarbeitet die Antwort">&#x21BB;</button>
+        </div>
         <div class="btn-row">
-          <button class="btn btn-primary btn-sm" onclick="generateReply()">KI Antwort generieren</button>
-          <button class="btn btn-success btn-sm" onclick="sendReply()">Senden</button>
-          <button class="btn btn-outline btn-sm" onclick="saveDraft()">Entwurf</button>
+          <button class="btn btn-primary btn-sm" onclick="generateReply()">KI formulieren</button>
+          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook()">In Outlook oeffnen</button>
         </div>
       </div>
     </div>
@@ -1570,6 +1577,74 @@ async function generateReply() {
   }
 }
 
+// Antwort ueberarbeiten basierend auf Anweisung
+async function refineReply() {
+  var instruction = document.getElementById('reply-instruction').value.trim();
+  if (!instruction) { showToast('Bitte Anweisung eingeben', 'info'); return; }
+  var currentReply = document.getElementById('reply-text').value.trim();
+  if (!currentReply) { showToast('Erst eine Antwort generieren', 'info'); return; }
+
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
+
+  document.getElementById('reply-text').value = 'Wird ueberarbeitet...';
+
+  var prompt = 'Du hast diese Antwort-Mail geschrieben:\n\n' + currentReply
+    + '\n\nDer Nutzer moechte folgende Aenderung:\n' + instruction
+    + '\n\nUrspruengliche Mail war von: ' + state.from + '\nBetreff: ' + state.subject
+    + '\n\nSchreibe die ueberarbeitete Antwort. NUR die Antwort, keine Erklaerung. Keine Signatur.';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    var data = await response.json();
+    var reply = data.content[0].text;
+    state.replyText = reply;
+    document.getElementById('reply-text').value = reply;
+    document.getElementById('reply-instruction').value = '';
+    showToast('Antwort ueberarbeitet', 'success');
+  } catch(e) {
+    document.getElementById('reply-text').value = currentReply;
+    showToast('Fehler: ' + e.message, 'error');
+  }
+}
+
+// Antwort in Outlook oeffnen (native Reply-Funktion)
+function openReplyInOutlook() {
+  var replyText = document.getElementById('reply-text').value.trim();
+  if (!replyText) { showToast('Keine Antwort vorhanden', 'info'); return; }
+  var item = Office.context.mailbox.item;
+  if (!item) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
+  // displayReplyForm oeffnet Outlooks native Antwort mit vorausgefuelltem Text
+  item.displayReplyForm(replyText);
+  showToast('Antwort in Outlook geoeffnet', 'success');
+}
+
+// Textfeld erweitern/verkleinern
+function toggleReplyExpand() {
+  var ta = document.getElementById('reply-text');
+  ta.classList.toggle('expanded');
+  // Wenn erweitert: andere Sektionen einklappen
+  if (ta.classList.contains('expanded')) {
+    ['sec-aktion', 'sec-analysis', 'sec-folder', 'sec-attachments', 'sec-tasks', 'sec-feedback'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('collapsed');
+    });
+  }
+}
+
 /* ========== MAIL VERSCHIEBEN (Graph API) ========== */
 async function moveMailToFolder() {
   var folderName = document.getElementById('folder-input').value.trim();
@@ -1857,7 +1932,7 @@ async function executeAll() {
   // 3. Antwort senden (wenn Toggle an und Text vorhanden)
   if (state.replyNeeded && document.getElementById('reply-text').value.trim()) {
     steps.push('Antwort senden');
-    try { await sendReply(); } catch(e) { errors.push('Senden: ' + e.message); }
+    try { openReplyInOutlook(); } catch(e) { errors.push('Antwort oeffnen: ' + e.message); }
   }
 
   // 4. Feedback speichern
