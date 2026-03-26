@@ -1,100 +1,101 @@
-# CLAUDE.md – KI Mail Assistent für Ole Reinpold (EHC Hamburg)
+# CLAUDE.md – KI Mail Assistent fuer Ole Reinpold (EHC Hamburg)
 
 Lies diese Datei IMMER komplett bevor du irgendetwas tust.
+Lies danach PROJEKTSTAND.md und KONZEPT.md fuer den vollstaendigen Kontext.
 
 ## Wer ist Ole?
 - Ole Reinpold, Ansprache: Du, Sprache: immer Deutsch
 - Prokurist/GF: Elbe Hernien Centrum EHC GmbH (Hamburger Hernien Centrum), ~8 Mitarbeiter, Hernienchirurgie
-- Mitgründer/GF: Qodia GmbH (KI-Lösungen GOÄ-Abrechnung), 4 Gründer
-- Kein Entwickler. Technikaffinität 6-7/10. Braucht klare Anweisungen ohne Fachjargon.
+- Mitgruender/GF: Qodia GmbH (KI-Loesungen GOAe-Abrechnung), 4 Gruender
+- Kein Entwickler. BWLer, technikaffin (6-7/10). Braucht klare Anweisungen ohne Fachjargon.
 - Will als Sparringspartner gefordert werden – challenge Ole aktiv wenn er auf dem falschen Weg ist.
+- Tendenz: Verbeisst sich manchmal zu lang in Themen (eigene Einschaetzung).
 - Langfristiges Ziel: Gesamten Arbeitsalltag automatisieren. E-Mail ist Schritt 1.
 
 ## Wie wir zusammenarbeiten (IMMER einhalten)
-- Erkläre jeden Schritt klar bevor du ihn ausführst
-- Zeige Code-Änderungen zur Review bevor du sie speicherst – frage: "Soll ich das so umsetzen?"
-- Wenn Ole sagt "Stopp" oder "warte" – sofort aufhören, nicht weitermachen
+- Du bist Sparringspartner UND Umsetzer. Ole erwartet beides.
+- Challenge Ole aktiv – hinterfrage Entscheidungen, weise auf Risiken hin.
+- Erklaere jeden Schritt klar bevor du ihn ausfuehrst
+- Wenn Ole sagt "Stopp" oder "warte" – sofort aufhoeren
 - Wenn du unsicher bist: sag es direkt, recherchiere, gib dann eine klare Empfehlung
-- Triff keine Annahmen über was Ole will – frag lieber einmal zu viel
+- Triff keine Annahmen ueber was Ole will – frag lieber einmal zu viel
 - Nach jeder Session: CLAUDE.md und PROJEKTSTAND.md aktualisieren
+- ALLE Arbeitsergebnisse muessen in Dateien stehen, NIE nur im Chat-Kontext
+- WICHTIG: Am Ende jeder Session IMMER Git Commit machen damit nichts verloren geht
+- WICHTIG: Niemals E-Mails automatisch senden – IMMER nur in Outlook oeffnen
 
 ## Was dieses Projekt ist
-Ein KI-gesteuerter E-Mail-Assistent der Ole hilft, seine täglichen E-Mails schnell abzuarbeiten.
+Ein Outlook Add-in das als Seitenleiste in Outlook laeuft und Ole hilft, seine E-Mails schneller abzuarbeiten.
+Es nutzt ein lokales "Gedaechtnis" (Textdateien) das der KI bei jeder Analyse mitgegeben wird.
 
 ### Was der Assistent pro Mail tut:
-1. Priorität vorschlagen: Wichtig & Dringend / Wichtig / Muss gemacht werden / Nice to have / Nachhalten
-2. Antwortvorschlag generieren (in Oles Stil, auf Deutsch, bearbeitbar)
-3. E-Mail-Ordner vorschlagen (wo die Mail in Outlook abgelegt werden soll)
-4. Anhänge in OneDrive ablegen: Format JJMMTT_Organisation_Dateiname.ext
-5. Aufgabenliste: Nur was ÜBER Antworten+Ablegen hinausgeht. Nicht kleinteilig. Keine Ablage-Aufgaben. Max 3.
-6. Feedback-System: "Alles 100% korrekt" oder "Nicht korrekt" + Freitext. KI lernt daraus UND aus manuellen Anpassungen.
-7. Wiederkehrende Mails: Toggle + Intervall, System merkt sich Einstellungen
+1. Aktion vorschlagen: Sofort / Erledigen / ToDo Wichtig / ToDo NTH / Nachhalten / Ablage / Loeschen
+2. Ordner vorschlagen (wo die Mail in Outlook abgelegt werden soll)
+3. Antwortvorschlag generieren (in Oles Stil, auf Deutsch, bearbeitbar)
+4. Anhaenge in OneDrive ablegen: Format JJMMTT_Organisation_Dateiname.ext
+5. Aufgaben in Microsoft To Do erstellen (nur was UEBER Antworten+Ablegen hinausgeht, max 3)
+6. Feedback-System: Toggle korrekt/nicht korrekt + Freitext, KI lernt daraus
+
+### Aktions-Buttons:
+| Button | Ziel-Ordner |
+|--------|------------|
+| Sofort | bleibt im Posteingang |
+| Erledigen | bleibt im Posteingang |
+| ToDo Wichtig | 01_ToDo / 02_Wichtig |
+| ToDo NTH | 01_ToDo / 04_NTH |
+| Nachhalten | 02_Nachhalten |
+| Ablage | KI waehlt passenden Ordner |
+| Loeschen | Geloeschte Elemente + Domain-Sperren Toggle |
 
 ### Entschiedene UI-Regeln:
 - keine_antwort_noetig: true bei Rechnungen, Newslettern, Infomails
-- Antwort als Toggle (Ja/Nein), nicht als Button
+- Antwort als Toggle (Ja/Nein), drei Buttons: Antworten / Allen antworten / Weiterleiten
 - Aufgaben: nie kleinteilig, nie "Beleg ablegen" wenn Anhang ohnehin abgelegt wird
-- KI-Analyse standardmässig zugeklappt (bei Bedarf aufklappbar)
+- KI-Analyse standardmaessig zugeklappt
+- Domain-Sperren Toggle nur sichtbar wenn Aktion "Loeschen" gewaehlt
+- Antwort NIE automatisch senden – IMMER in Outlook oeffnen (Reply All als Standard)
+- API-Kostenschutz: Analyse nur manuell, nie automatisch, nie doppelt
 
-## Tech Stack
-- Alles in EINER index.html (kein separates app.js)
-- GitHub Repo: olereinpold92/ki-mail-assistent
-- Netlify: https://bright-cannoli-eeaa45.netlify.app / Login: EHC2026
-- Netlify Pro Plan (1000 Build-Credits/Monat) – sparsam einsetzen!
-- Azure Client ID: aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0
-- Azure Tenant ID: 710620de-9a6b-4cca-bf53-99ce2a3e407f
-- Azure Redirect URI: https://bright-cannoli-eeaa45.netlify.app/ (SPA, Implicit Flow aktiv)
-- Azure Berechtigungen: User.Read, Mail.ReadWrite, Mail.Send, Files.ReadWrite – alle erteilt
+## Architektur: Outlook Add-in
+- Outlook Add-in (Seitenleiste) statt eigener Web-App
+- Alles in EINER taskpane.html (HTML + CSS + JS, ~2500 Zeilen)
+- Lokaler HTTPS-Server (Python, Port 3000)
+- MSAL.js lokal eingebunden (nicht ueber CDN)
+- manifest.xml fuer Outlook Sideloading
+- Gedaechtnis-System: Textdateien unter /gedaechtnis/
+
+## Azure Konfiguration
+- Client ID: aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0
+- Tenant ID: 710620de-9a6b-4cca-bf53-99ce2a3e407f
+- Redirect URIs (SPA): http://localhost:8080, https://localhost:3000, https://localhost:3000/addin/taskpane.html
+- Berechtigungen: User.Read, Mail.ReadWrite, Mail.Send, Files.ReadWrite, Tasks.ReadWrite – alle erteilt
 
 ## Microsoft 365 Setup
 - Postfach: o.reinpold@hernie.de (Microsoft 365 Business Standard)
-- MX-Record bleibt bei all-inkl (Mitarbeiter unberührt)
-- Weiterleitung: all-inkl → Microsoft 365 als Kopieempfänger
-- SPF: v=spf1 a mx include:spf.kasserver.com include:spf.protection.outlook.com ~all
-- Internal Relay konfiguriert in Exchange
+- MX-Record bleibt bei all-inkl (Mitarbeiter unberuehrt)
 - OneDrive: C:\Users\Startklar\OneDrive - Elbe Hernien Centrum EHC GmbH
 
-## OneDrive Ordnerstruktur
-EHC: Eingangsrechnungen, Verträge, Korrespondenz, Personal, Finanzen, OP-Dokumentation
-Qodia: Allgemein, Investoren, Verträge
-Privat: Allgemein
-Kein Anhang
+## Wie man das Add-in startet
+1. start-addin.bat doppelklicken (startet HTTPS-Server auf Port 3000)
+2. Outlook oeffnen (neues Outlook empfohlen), Mail anklicken
+3. "KI Mail Assistent" Button im Ribbon klicken
+4. Beim ersten Mal: Claude API Key in Einstellungen eintragen
+5. "Verbinden" klicken fuer Microsoft OAuth
 
-## Deploy-Workflow
-- Änderungen in index.html lokal speichern
-- In GitHub Desktop: Commit + Push
-- In Netlify: Deploys → "Trigger deploy" manuell auslösen
-- Danach: Auto-Deploy sofort wieder deaktivieren
-- NIEMALS direkt auf main pushen ohne dass Ole die Änderung gesehen hat
-
-## Was aktuell deployed ist (Stand 25.03.2026)
-Die Live-Seite zeigt noch einen älteren Stand. Die fertige preview6.html mit allen Features wurde noch nicht korrekt deployed.
-
-### Was in preview6.html fertig ist (17 Features):
-1. 4-Spalten-Layout: Ordner-Sidebar | Mail-Liste | Mail-Inhalt | KI-Panel
-2. Verschiebbare Spaltenbreiten (Drag-to-resize), Einstellung wird gespeichert
-3. Alle Spalten auf/zuklappbar, Einstellung wird gespeichert
-4. Prio manuell anpassbar (5 Buttons)
-5. KI-Analyse einklappbar (standardmässig zu)
-6. Aufgabenliste mit Checkbox + eigene Aufgaben hinzufügbar
-7. Ablegen-Bereich: Mail verschieben + Anhänge mit editierbarem Dateinamen + Ordner-Selector + Neuer Unterordner
-8. Antwort als Toggle (Ja/Nein)
-9. Feedback: Alles korrekt / Nicht korrekt + Freitext
-10. Wiederkehrende Mails: Toggle + Intervall
-11. "Alles bestätigen & ausführen": Ein Klick macht alles
-12. Echte Outlook-Ordner laden via Graph API
-13. Klick auf Ordner lädt Mails aus diesem Ordner
-14. Mail wirklich verschieben via Graph API
-15. OneDrive-Ordner laden (echte Struktur im Dropdown)
-16. Anhang in OneDrive ablegen (echte Upload-Funktion)
-17. KI lernt aus Anpassungen UND Feedback via localStorage
-
-## Erste Aufgabe in dieser Session
-Lies zuerst die aktuelle index.html im Repo. Dann zeige Ole was der aktuelle Stand ist und was als nächstes ansteht. Frag ihn bevor du irgendetwas änderst.
+## Bekannte Limitierungen (NICHT nochmal versuchen zu loesen)
+- Add-in Pinning funktioniert nicht (Microsoft-Bug, beide Outlook-Versionen)
+- Graph API childFolders Bug: Unterordner von Posteingang werden nicht geliefert
+  → Mail-Ordner sind fest im Code als FOLDER_STRUCTURE hinterlegt
+  → Neue Ordner ueber "+ Ordner" Button manuell hinzufuegen
+- Folder-ID wird per Rueckwaerts-Suche gefunden (Ordner muss mind. 1 Mail enthalten)
+- Breite der Seitenleiste im neuen Outlook nicht aenderbar
+- OneDrive-Ordner per Graph API funktionieren OHNE Bug
 
 ## Entschiedene Punkte – nicht nochmal diskutieren
-- Claude Code wurde als Entwicklungsumgebung gewählt (statt Browser-Chat) wegen Kontextverlust-Problem
-- n8n/Make/Power Automate: verworfen, direkte Graph API ist besser
-- Ein-Datei-Ansatz (alles in index.html): beibehalten
-- App-Passwort: EHC2026
-- Architektur (GitHub + Netlify + Graph API + Claude API im Browser): bestätigt richtig
+- Outlook Add-in statt Web-App: ENTSCHIEDEN (25.03.2026)
+- n8n/Make/Power Automate: VERWORFEN
+- Claude Code als Entwicklungsumgebung: ENTSCHIEDEN
+- Ein-Datei-Ansatz (taskpane.html): BEIBEHALTEN
+- Claude API Key im localStorage: akzeptiertes Risiko
+- Microsoft To Do fuer Aufgaben: ENTSCHIEDEN (parallel zu E-Mail-Ordner-System)
+- Antworten NIE automatisch senden: IMMER nur in Outlook oeffnen

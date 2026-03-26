@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "beschreibung": "Regeln fuer Antwort-Verhalten",
+  "keine_antwort_noetig": [
+    "Rechnungen",
+    "Newsletter",
+    "Infomails ohne Handlungsaufforderung",
+    "Automatische Benachrichtigungen",
+    "Werbung"
+  ],
+  "antwort_stil": {
+    "sprache": "Deutsch",
+    "tonfall": "Professionell aber nicht steif, direkt, effizient",
+    "laenge": "So kurz wie moeglich, so lang wie noetig",
+    "grussformel_anfang": "Noch zu erfassen",
+    "grussformel_ende": "Noch zu erfassen",
+    "signatur": "Ole Reinpold\nGeschaeftsleitung\nM +49 151 1531 1887\nE o.reinpold@hernie.de\nWebsite | LinkedIn\n\nHAMBURGER HERNIEN CENTRUM\nElbe Hernien Centrum EHC GmbH | Wendenweg 12 | 21465 Wentorf\nGeschaeftsfuehrer: Dr. med. Wolfgang Reinpold\nAmtsgericht Luebeck, HRB 20507 HL"
+  },
+  "hinweis": "Stil wird aus echten Antworten von Ole verfeinert"
+}

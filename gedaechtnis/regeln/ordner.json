@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "beschreibung": "Regeln fuer die Zuordnung von Mails zu Outlook-Ordnern",
+  "standard_ordner": "Posteingang",
+  "regeln": [
+    {
+      "wenn": "Absender enthaelt 'atos' oder Betreff enthaelt 'ATOS'",
+      "dann": "Firmen & Organisationen / ATOS",
+      "konfidenz": 0.9,
+      "quelle": "outlook_ordnerstruktur"
+    },
+    {
+      "wenn": "Absender enthaelt 'helios'",
+      "dann": "Firmen & Organisationen / Helios",
+      "konfidenz": 0.9,
+      "quelle": "outlook_ordnerstruktur"
+    },
+    {
+      "wenn": "Absender enthaelt 'stepstone' oder 'indeed' oder Betreff enthaelt 'Bewerbung'",
+      "dann": "Personal / Bewerbungen",
+      "konfidenz": 0.8,
+      "quelle": "outlook_ordnerstruktur"
+    },
+    {
+      "wenn": "Mail ist eine Rechnung oder enthaelt Rechnungsanhang",
+      "dann": "Finanzbuchhaltung",
+      "konfidenz": 0.7,
+      "quelle": "vermutung"
+    }
+  ],
+  "bekannte_ordner": [
+    "00_Archiv",
+    "01_ToDo / 01_Wichtig & Dringend",
+    "01_ToDo / 02_Wichtig",
+    "01_ToDo / 03_Muss gemacht werden",
+    "01_ToDo / 04_NTH",
+    "02_Nachhalten",
+    "BAG",
+    "Business Development",
+    "Controlling",
+    "Finanzbuchhaltung",
+    "Firmen & Organisationen / Abrechnung",
+    "Firmen & Organisationen / ATOS",
+    "Firmen & Organisationen / Behoerden",
+    "Firmen & Organisationen / Bestellungen",
+    "Firmen & Organisationen / Elbklinik",
+    "Firmen & Organisationen / FAK",
+    "Firmen & Organisationen / Hafenklinik",
+    "Firmen & Organisationen / Helios",
+    "Firmen & Organisationen / Krankenkassen",
+    "Firmen & Organisationen / Reisen",
+    "Firmen & Organisationen / Versicherung",
+    "Hanse",
+    "Hernia Consult",
+    "Hernienmissionen",
+    "HHC",
+    "Hospitationen",
+    "IT",
+    "Kommunikation / hernie.de",
+    "Kommunikation / hernie.net",
+    "KV",
+    "Newsletter",
+    "Personal / Bewerbungen",
+    "Personal / Offen",
+    "Persoenliches",
+    "Politik",
+    "Prozesse",
+    "Rechtliches",
+    "Strategie",
+    "Unternehmen",
+    "Wolle",
+    "Steuer"
+  ]
+}

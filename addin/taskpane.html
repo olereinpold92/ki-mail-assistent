@@ -40,6 +40,7 @@
     .prio-btn[data-a="todo_nth"].active { background: #fbc02d; color: #333; }
     .prio-btn[data-a="nachhalten"].active { background: #42a5f5; }
     .prio-btn[data-a="ablage"].active { background: #66bb6a; }
+    .prio-btn[data-a="loeschen"].active { background: #9e9e9e; }
 
     /* Folder select */
     select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
@@ -183,6 +184,7 @@
         <button class="prio-btn" data-a="todo_nth" onclick="setAktion(this)">ToDo NTH</button>
         <button class="prio-btn" data-a="nachhalten" onclick="setAktion(this)">Nachhalten</button>
         <button class="prio-btn" data-a="ablage" onclick="setAktion(this)">Ablage</button>
+        <button class="prio-btn" data-a="loeschen" onclick="setAktion(this)">Loeschen</button>
       </div>
     </div>
   </div>
@@ -255,7 +257,11 @@
         <textarea id="reply-instruction" class="reply-expandable" placeholder="z.B. 'formeller' oder 'frag nach dem Termin'" onclick="expandField(this)" onblur="shrinkField(this)"></textarea>
         <div class="btn-row">
           <button class="btn btn-primary btn-sm" onclick="refineOrGenerate()">KI formulieren</button>
-          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook()">In Outlook oeffnen</button>
+        </div>
+        <div class="btn-row" style="margin-top:4px">
+          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook('reply')">Antworten</button>
+          <button class="btn btn-success btn-sm" onclick="openReplyInOutlook('replyAll')">Allen antworten</button>
+          <button class="btn btn-outline btn-sm" onclick="openReplyInOutlook('forward')">Weiterleiten</button>
         </div>
       </div>
     </div>
@@ -280,15 +286,16 @@
   <div class="section" id="sec-feedback">
     <div class="section-head" onclick="toggleSection('sec-feedback')">Feedback <span class="arrow">▼</span></div>
     <div class="section-body">
-      <div class="fb-row">
-        <button class="btn btn-success btn-sm" onclick="sendFeedback(true)">Alles 100% korrekt</button>
-        <button class="btn btn-danger btn-sm" onclick="sendFeedback(false)">Nicht korrekt</button>
+      <div class="reply-toggle" style="margin-bottom:6px">
+        <label class="toggle">
+          <input type="checkbox" id="fb-correct-toggle" checked onchange="updateFeedbackUI()">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="fb-toggle-label" style="font-size:12px;color:#107c10;font-weight:600">Alles korrekt</span>
       </div>
-      <div id="fb-detail" style="display:none;margin-top:8px">
-        <textarea id="fb-text" placeholder="Was war falsch? (hilft der KI zu lernen)" style="min-height:60px"></textarea>
-        <div class="btn-row">
-          <button class="btn btn-primary btn-sm" onclick="submitFeedback()">Feedback senden</button>
-        </div>
+      <textarea id="fb-text" class="reply-expandable" placeholder="Hinweise oder Feedback fuer die KI..." style="min-height:36px;max-height:36px" onfocus="this.style.minHeight='80px';this.style.maxHeight='120px'" onblur="if(!this.value)this.style.minHeight='36px';if(!this.value)this.style.maxHeight='36px'"></textarea>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick="submitFeedback()">Feedback speichern</button>
       </div>
     </div>
   </div>
@@ -1530,9 +1537,14 @@ function setAktion(btn) {
   var aktionOrdnerMap = {
     'todo_wichtig': '01_ToDo / 02_Wichtig',
     'todo_nth': '01_ToDo / 04_NTH',
-    'nachhalten': '02_Nachhalten'
+    'nachhalten': '02_Nachhalten',
+    'loeschen': 'deleteditems'
   };
-  if (aktionOrdnerMap[state.aktion]) {
+  if (state.aktion === 'loeschen') {
+    document.getElementById('folder-input').value = 'Geloeschte Elemente';
+    state.folder = 'deleteditems';
+    state.folderId = null; // wird per well-known name geloescht
+  } else if (aktionOrdnerMap[state.aktion]) {
     var ziel = aktionOrdnerMap[state.aktion];
     document.getElementById('folder-input').value = ziel;
     state.folder = ziel;
@@ -1680,20 +1692,22 @@ async function getOrCreateTodoList(name) {
 }
 
 /* ========== FEEDBACK ========== */
-function sendFeedback(correct) {
-  if (correct) {
-    saveFeedbackToStorage(true, '');
-    showToast('Danke! KI lernt daraus.', 'success');
+function updateFeedbackUI() {
+  var toggle = document.getElementById('fb-correct-toggle');
+  var label = document.getElementById('fb-toggle-label');
+  if (toggle.checked) {
+    label.textContent = 'Alles korrekt';
+    label.style.color = '#107c10';
   } else {
-    document.getElementById('fb-detail').style.display = 'block';
+    label.textContent = 'Nicht korrekt';
+    label.style.color = '#d32f2f';
   }
 }
 
 function submitFeedback() {
+  var correct = document.getElementById('fb-correct-toggle').checked;
   var text = document.getElementById('fb-text').value.trim();
-  saveFeedbackToStorage(false, text);
-  document.getElementById('fb-detail').style.display = 'none';
-  document.getElementById('fb-text').value = '';
+  saveFeedbackToStorage(correct, text);
   showToast('Feedback gespeichert. KI lernt daraus.', 'success');
 }
 
@@ -1706,13 +1720,13 @@ function saveFeedbackToStorage(correct, text) {
     korrekt: correct,
     kommentar: text,
     ki_vorschlag: {
-      prio: state.analysis ? state.analysis.prioritaet : '',
+      aktion: state.analysis ? state.analysis.aktion : '',
       ordner: state.analysis ? state.analysis.ordner : '',
       antwort_noetig: state.analysis ? state.analysis.antwort_noetig : null
     },
     korrektur: {
-      prio: state.prio,
-      ordner: document.getElementById('folder-select').value,
+      aktion: state.aktion,
+      ordner: document.getElementById('folder-input').value,
       antwort_noetig: state.replyNeeded
     }
   });
@@ -1981,27 +1995,50 @@ async function refineReply() {
   }
 }
 
-// Antwort in Outlook oeffnen (native Reply-Funktion)
-function openReplyInOutlook() {
+// Antwort in Outlook oeffnen (native Reply-Funktion, nie automatisch senden)
+async function openReplyInOutlook(mode) {
+  mode = mode || 'replyAll';
   var replyText = document.getElementById('reply-text').value.trim();
-  if (!replyText) { showToast('Keine Antwort vorhanden', 'info'); return; }
+  if (!replyText && mode !== 'forward') { showToast('Keine Antwort vorhanden', 'info'); return; }
   var item = Office.context.mailbox.item;
   if (!item) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
 
   // Text in HTML umwandeln (Absaetze erhalten)
-  var htmlBody = replyText
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-  htmlBody = '<p>' + htmlBody + '</p>';
+  var htmlBody = '';
+  if (replyText) {
+    htmlBody = replyText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    htmlBody = '<p>' + htmlBody + '</p>';
+  }
 
-  // displayReplyForm mit HTML-Body
-  item.displayReplyForm({
-    htmlBody: htmlBody
-  });
-  showToast('Antwort in Outlook geoeffnet', 'success');
+  if (mode === 'reply') {
+    item.displayReplyForm({ htmlBody: htmlBody });
+    showToast('Antwort in Outlook geoeffnet', 'success');
+  } else if (mode === 'replyAll') {
+    item.displayReplyAllForm({ htmlBody: htmlBody });
+    showToast('Antwort (alle) in Outlook geoeffnet', 'success');
+  } else if (mode === 'forward') {
+    // Forward ueber Graph API erstellen (Office.js hat kein displayForwardForm)
+    if (state.graphToken && state.restMailId) {
+      try {
+        var fwdRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/createForward', {
+          method: 'POST',
+          body: JSON.stringify({ comment: replyText || '' })
+        });
+        if (fwdRes && fwdRes.ok) {
+          showToast('Weiterleitung als Entwurf erstellt – oeffne Entwuerfe in Outlook', 'success');
+        } else {
+          showToast('Weiterleitung fehlgeschlagen', 'error');
+        }
+      } catch(e) { showToast('Weiterleitung fehlgeschlagen: ' + e.message, 'error'); }
+    } else {
+      showToast('Bitte erst mit Microsoft verbinden', 'info');
+    }
+  }
 }
 
 // KI formulieren oder ueberarbeiten (ein Button fuer beides)
@@ -2090,33 +2127,41 @@ async function moveMailToFolder() {
   if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
   if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
 
-  // Folder-ID finden: aus bekannten Ordnern oder per API-Suche
-  var folderId = state.folderId || outlookFolderMap[folderName];
+  // Bei Loeschen: well-known name "deleteditems" verwenden
+  var folderId;
+  if (state.folder === 'deleteditems' || state.aktion === 'loeschen') {
+    folderId = 'deleteditems';
+  } else {
+    // Folder-ID finden: aus bekannten Ordnern oder per API-Suche
+    folderId = state.folderId || outlookFolderMap[folderName];
 
-  // Fallback: per Graph API nach dem Ordnernamen suchen
-  if (!folderId) {
-    showToast('Ordner "' + folderName + '" wird gesucht...', 'info');
-    folderId = await findFolderByName(folderName);
-  }
+    // Fallback: per Graph API nach dem Ordnernamen suchen
+    if (!folderId) {
+      showToast('Ordner "' + folderName + '" wird gesucht...', 'info');
+      folderId = await findFolderByName(folderName);
+    }
 
-  if (!folderId) {
-    showToast('Ordner "' + folderName + '" nicht gefunden', 'error');
-    return;
+    if (!folderId) {
+      showToast('Ordner "' + folderName + '" nicht gefunden', 'error');
+      return;
+    }
   }
 
   try {
-    showToast('Mail wird verschoben...', 'info');
+    showToast(state.aktion === 'loeschen' ? 'Mail wird geloescht...' : 'Mail wird verschoben...', 'info');
     var res = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
       method: 'POST',
       body: JSON.stringify({ destinationId: folderId })
     });
     if (res && res.ok) {
-      showToast('Mail verschoben → ' + folderName, 'success');
-      // Folder-ID merken
-      if (folderId) outlookFolderMap[folderName] = folderId;
-      saveFolderIdCache();
-      // Lern-System: Absender → Ordner merken
-      learnMailFolder(state.fromEmail, folderName);
+      showToast(state.aktion === 'loeschen' ? 'Mail geloescht' : 'Mail verschoben → ' + folderName, 'success');
+      // Folder-ID merken (nicht bei loeschen)
+      if (folderId && state.aktion !== 'loeschen') {
+        outlookFolderMap[folderName] = folderId;
+        saveFolderIdCache();
+        // Lern-System: Absender → Ordner merken
+        learnMailFolder(state.fromEmail, folderName);
+      }
     } else {
       var err = res ? await res.json() : {};
       showToast('Fehler: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
@@ -2370,14 +2415,23 @@ async function executeAll() {
     try { await uploadAllAttachments(); } catch(e) { errors.push('Upload: ' + e.message); }
   }
 
-  // 3. Antwort senden (wenn Toggle an und Text vorhanden)
+  // 3. Antwort in Outlook oeffnen (wenn Toggle an und Text vorhanden) – NIE automatisch senden
   if (state.replyNeeded && document.getElementById('reply-text').value.trim()) {
-    steps.push('Antwort senden');
-    try { openReplyInOutlook(); } catch(e) { errors.push('Antwort oeffnen: ' + e.message); }
+    steps.push('Antwort oeffnen');
+    try { openReplyInOutlook('replyAll'); } catch(e) { errors.push('Antwort oeffnen: ' + e.message); }
   }
 
-  // 4. Feedback speichern
-  saveFeedbackToStorage(true, '');
+  // 4. Aufgaben in Microsoft To Do erstellen (wenn vorhanden)
+  var taskItems = document.querySelectorAll('.task-item');
+  if (taskItems.length > 0) {
+    steps.push('To Do erstellen');
+    try { await createTodosInMicrosoft(); } catch(e) { errors.push('To Do: ' + e.message); }
+  }
+
+  // 5. Feedback speichern (Toggle-Status verwenden)
+  var fbCorrect = document.getElementById('fb-correct-toggle').checked;
+  var fbText = document.getElementById('fb-text').value.trim();
+  saveFeedbackToStorage(fbCorrect, fbText);
 
   if (errors.length === 0) {
     showToast('Alles erledigt! (' + steps.join(', ') + ')', 'success');

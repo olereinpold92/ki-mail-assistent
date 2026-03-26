@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "beschreibung": "Regeln fuer Anhang-Ablage in OneDrive",
+  "dateiname_format": "JJMMTT_Organisation_Dateiname.ext",
+  "dateiname_beispiel": "260325_Helios_Kliniken_Rechnung_2026-0342.pdf",
+  "onedrive_basis": "C:\\Users\\Startklar\\OneDrive - Elbe Hernien Centrum EHC GmbH",
+  "ordner": {
+    "EHC": [
+      "Eingangsrechnungen",
+      "Vertraege",
+      "Korrespondenz",
+      "Personal",
+      "Finanzen",
+      "OP-Dokumentation"
+    ],
+    "Qodia": [
+      "Allgemein",
+      "Investoren",
+      "Vertraege"
+    ],
+    "Privat": [
+      "Allgemein"
+    ]
+  },
+  "regeln": [
+    {
+      "wenn": "Anhang ist eine Rechnung",
+      "dann_ordner": "EHC / Eingangsrechnungen",
+      "konfidenz": 0.8
+    },
+    {
+      "wenn": "Anhang ist ein Vertrag oder Vertragsentwurf",
+      "dann_ordner": "EHC / Vertraege",
+      "konfidenz": 0.7
+    },
+    {
+      "wenn": "Anhang ist ein Lebenslauf oder Bewerbungsunterlage",
+      "dann_ordner": "EHC / Personal",
+      "konfidenz": 0.8
+    },
+    {
+      "wenn": "Mail betrifft Qodia",
+      "dann_ordner": "Qodia / Allgemein",
+      "konfidenz": 0.6
+    }
+  ]
+}
