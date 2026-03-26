@@ -199,6 +199,7 @@
       <div class="btn-row">
         <button class="btn btn-primary btn-sm" onclick="moveMailToFolder()">Mail verschieben</button>
         <button class="btn btn-outline btn-sm" onclick="refreshFolders()">Ordner neu laden</button>
+        <button class="btn btn-outline btn-sm" onclick="debugFolders()">Debug Ordner</button>
       </div>
     </div>
   </div>
@@ -459,7 +460,51 @@ async function refreshFolders() {
   localStorage.removeItem('ki_folders_loaded_at');
   showToast('Ordner werden neu geladen...', 'info');
   await loadOutlookFolders();
-  showToast('Ordner aktualisiert', 'success');
+  showToast('Ordner aktualisiert (' + (document.getElementById('folder-select').options.length - 1) + ' Ordner)', 'success');
+}
+
+// Debug: Zeigt genau was die API zurueckgibt
+async function debugFolders() {
+  if (!state.graphToken) { showToast('Nicht verbunden', 'error'); return; }
+  var log = [];
+
+  // 1. Was gibt /me/mailFolders zurueck?
+  var res1 = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
+  if (res1 && res1.ok) {
+    var d1 = await res1.json();
+    log.push('=== /me/mailFolders (Top-Level) ===');
+    (d1.value || []).forEach(function(f) {
+      log.push(f.displayName + ' (children: ' + f.childFolderCount + ', id: ' + f.id.substring(0,20) + '...)');
+    });
+  }
+
+  // 2. Was gibt msgfolderroot zurueck?
+  var res2 = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/msgfolderroot/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
+  if (res2 && res2.ok) {
+    var d2 = await res2.json();
+    log.push('\n=== msgfolderroot/childFolders ===');
+    (d2.value || []).forEach(function(f) {
+      log.push(f.displayName + ' (children: ' + f.childFolderCount + ', id: ' + f.id.substring(0,20) + '...)');
+    });
+  }
+
+  // 3. Was gibt Inbox/childFolders zurueck?
+  var res3 = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
+  if (res3 && res3.ok) {
+    var d3 = await res3.json();
+    log.push('\n=== inbox/childFolders ===');
+    (d3.value || []).forEach(function(f) {
+      log.push(f.displayName + ' (children: ' + f.childFolderCount + ')');
+    });
+  } else {
+    log.push('\n=== inbox/childFolders FEHLER: ' + (res3 ? res3.status : 'null') + ' ===');
+  }
+
+  // Ergebnis anzeigen
+  var debugText = log.join('\n');
+  console.log(debugText);
+  document.getElementById('analysis-text').textContent = debugText;
+  document.getElementById('sec-analysis').classList.remove('collapsed');
 }
 
 /* ========== ORDNER-CACHE (localStorage) ========== */
