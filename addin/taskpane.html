@@ -311,12 +311,37 @@ function initMsal() {
       redirectUri: window.location.origin + '/addin/taskpane.html'
     },
     cache: {
-      cacheLocation: 'sessionStorage',
+      cacheLocation: 'localStorage',  // localStorage ueberlebt Add-in Reload!
       storeAuthStateInCookie: false
     }
   };
   msalInstance = new msal.PublicClientApplication(msalConfig);
   return msalInstance;
+}
+
+// Automatisch verbinden beim Start (wenn schon eingeloggt)
+async function autoConnect() {
+  try {
+    var instance = initMsal();
+    var accounts = instance.getAllAccounts();
+    if (accounts.length > 0) {
+      var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
+      state.graphToken = silentResult.accessToken;
+      updateConnectionUI(true);
+      // Gecachte Ordner sofort laden (kein API-Call noetig)
+      loadCachedFolders();
+      // Im Hintergrund: Ordner aktualisieren (nur wenn aelter als 1 Stunde)
+      var lastFolderLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
+      if (Date.now() - lastFolderLoad > 3600000) {
+        loadOutlookFolders();
+        loadOneDriveFolders();
+      }
+      return true;
+    }
+  } catch(e) {
+    console.log('Auto-Connect fehlgeschlagen (normal beim ersten Mal):', e.message);
+  }
+  return false;
 }
 
 async function connectMicrosoft() {
@@ -387,7 +412,6 @@ async function graphFetch(url, options) {
     options.headers['Content-Type'] = 'application/json';
   }
   var res = await fetch(url, options);
-  // Bei 401: Token erneuern und nochmal versuchen
   if (res.status === 401) {
     state.graphToken = null;
     token = await getGraphToken();
@@ -413,62 +437,77 @@ function updateConnectionUI(connected) {
 
 async function onGraphConnected() {
   showToast('Mit Microsoft verbunden', 'success');
-  // Ordner laden (parallel)
   await Promise.all([loadOutlookFolders(), loadOneDriveFolders()]);
+}
+
+/* ========== ORDNER-CACHE (localStorage) ========== */
+function saveFolderCaches(outlookFolders, oneDriveFolders) {
+  try {
+    if (outlookFolders) localStorage.setItem('ki_outlook_folders', JSON.stringify(outlookFolders));
+    if (oneDriveFolders) localStorage.setItem('ki_onedrive_folders', JSON.stringify(oneDriveFolders));
+    localStorage.setItem('ki_folders_loaded_at', String(Date.now()));
+  } catch(e) {}
+}
+
+function loadCachedFolders() {
+  try {
+    var of = JSON.parse(localStorage.getItem('ki_outlook_folders') || 'null');
+    if (of && of.folders && of.folders.length > 0) {
+      outlookFolderMap = of.map || {};
+      populateFolderDropdownReal(of.folders);
+    }
+    var odf = JSON.parse(localStorage.getItem('ki_onedrive_folders') || 'null');
+    if (odf) {
+      oneDriveFolderMap = odf;
+      if (state.attachments.length > 0) renderAttachments();
+    }
+  } catch(e) { console.warn('Cache laden fehlgeschlagen:', e); }
 }
 
 /* ========== OUTLOOK ORDNER LADEN ========== */
 async function loadOutlookFolders() {
   if (!state.graphToken) { populateFolderDropdown(); return; }
   try {
-    showToast('Outlook-Ordner werden geladen...', 'info');
     // Top-Level Ordner
-    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=50&$select=id,displayName,childFolderCount');
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=100&$select=id,displayName,childFolderCount');
     if (!res || !res.ok) { populateFolderDropdown(); return; }
     var data = await res.json();
     var topFolders = data.value || [];
 
     outlookFolderMap = {};
-    var allFolders = []; // {name, id, parentName}
+    var allFolders = [];
+
+    // Rekursiv alle Unterordner laden (bis 4 Ebenen tief)
+    async function loadChildren(parentId, parentPath, depth) {
+      if (depth > 4) return;
+      var childRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + parentId + '/childFolders?$top=100&$select=id,displayName,childFolderCount');
+      if (!childRes || !childRes.ok) return;
+      var childData = await childRes.json();
+      var children = childData.value || [];
+      for (var j = 0; j < children.length; j++) {
+        var c = children[j];
+        var fullPath = parentPath + ' / ' + c.displayName;
+        outlookFolderMap[fullPath] = c.id;
+        outlookFolderMap[c.displayName] = c.id;
+        allFolders.push({ name: c.displayName, id: c.id, parentName: parentPath, fullPath: fullPath });
+        if (c.childFolderCount > 0) {
+          await loadChildren(c.id, fullPath, depth + 1);
+        }
+      }
+    }
 
     for (var i = 0; i < topFolders.length; i++) {
       var f = topFolders[i];
       outlookFolderMap[f.displayName] = f.id;
-      allFolders.push({ name: f.displayName, id: f.id, parentName: null });
-
-      // Unterordner laden
+      allFolders.push({ name: f.displayName, id: f.id, parentName: null, fullPath: f.displayName });
       if (f.childFolderCount > 0) {
-        var childRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + f.id + '/childFolders?$top=50&$select=id,displayName,childFolderCount');
-        if (childRes && childRes.ok) {
-          var childData = await childRes.json();
-          var children = childData.value || [];
-          for (var j = 0; j < children.length; j++) {
-            var c = children[j];
-            var fullName = f.displayName + ' / ' + c.displayName;
-            outlookFolderMap[fullName] = c.id;
-            outlookFolderMap[c.displayName] = c.id;
-            allFolders.push({ name: c.displayName, id: c.id, parentName: f.displayName });
-
-            // Noch eine Ebene tiefer
-            if (c.childFolderCount > 0) {
-              var subRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + c.id + '/childFolders?$top=50&$select=id,displayName');
-              if (subRes && subRes.ok) {
-                var subData = await subRes.json();
-                (subData.value || []).forEach(function(s) {
-                  var subName = f.displayName + ' / ' + c.displayName + ' / ' + s.displayName;
-                  outlookFolderMap[subName] = s.id;
-                  outlookFolderMap[s.displayName] = s.id;
-                  allFolders.push({ name: s.displayName, id: s.id, parentName: f.displayName + ' / ' + c.displayName });
-                });
-              }
-            }
-          }
-        }
+        await loadChildren(f.id, f.displayName, 1);
       }
     }
-    // Dropdown befuellen
+
     populateFolderDropdownReal(allFolders);
-    showToast(allFolders.length + ' Outlook-Ordner geladen', 'success');
+    saveFolderCaches({ folders: allFolders, map: outlookFolderMap }, null);
+    console.log(allFolders.length + ' Outlook-Ordner geladen');
   } catch(e) {
     console.error('Ordner laden Fehler:', e);
     populateFolderDropdown();
@@ -478,7 +517,7 @@ async function loadOutlookFolders() {
 function populateFolderDropdownReal(folders) {
   var sel = document.getElementById('folder-select');
   sel.innerHTML = '<option value="">-- Ordner waehlen --</option>';
-  // Gruppiert nach Parent
+  // Gruppiert nach Top-Level Parent
   var grouped = {};
   var topLevel = [];
   folders.forEach(function(f) {
@@ -486,9 +525,9 @@ function populateFolderDropdownReal(folders) {
       topLevel.push(f);
       if (!grouped[f.name]) grouped[f.name] = [];
     } else {
-      var parent = f.parentName.split(' / ')[0];
-      if (!grouped[parent]) grouped[parent] = [];
-      grouped[parent].push(f);
+      var topParent = f.parentName.split(' / ')[0];
+      if (!grouped[topParent]) grouped[topParent] = [];
+      grouped[topParent].push(f);
     }
   });
   topLevel.forEach(function(top) {
@@ -496,15 +535,10 @@ function populateFolderDropdownReal(folders) {
     if (children.length > 0) {
       var og = document.createElement('optgroup');
       og.label = top.name;
-      // Parent selbst als Option
-      var pOpt = document.createElement('option');
-      pOpt.value = top.id;
-      pOpt.textContent = top.name;
-      og.appendChild(pOpt);
       children.forEach(function(c) {
         var cOpt = document.createElement('option');
         cOpt.value = c.id;
-        cOpt.textContent = (c.parentName ? c.parentName + ' / ' : '') + c.name;
+        cOpt.textContent = c.fullPath || (c.parentName + ' / ' + c.name);
         og.appendChild(cOpt);
       });
       sel.appendChild(og);
@@ -540,9 +574,11 @@ async function loadOneDriveFolders() {
         });
       }
     }
+    // Cache speichern
+    saveFolderCaches(null, oneDriveFolderMap);
     // Anhang-Dropdowns aktualisieren falls bereits sichtbar
     if (state.attachments.length > 0) renderAttachments();
-    showToast('OneDrive-Ordner geladen', 'success');
+    console.log(Object.keys(oneDriveFolderMap).length + ' OneDrive-Ordner geladen');
   } catch(e) {
     console.warn('OneDrive Ordner Fehler:', e);
   }
@@ -561,6 +597,13 @@ var gedaechtnis = {
 Office.onReady(function(info) {
   if (info.host === Office.HostType.Outlook) {
     loadConfig();
+    // Automatisch mit Microsoft verbinden (Token aus localStorage)
+    autoConnect().then(function(connected) {
+      if (!connected) {
+        // Nicht verbunden – gecachte Ordner trotzdem laden
+        loadCachedFolders();
+      }
+    });
     loadGedaechtnis().then(function() {
       readMailData();
     });
@@ -568,7 +611,6 @@ Office.onReady(function(info) {
     // Pinning: Wenn der Nutzer eine andere Mail anklickt, automatisch neu laden
     if (Office.context.mailbox.addHandlerAsync) {
       Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function() {
-        // Neue Mail ausgewaehlt – UI zuruecksetzen und neu laden
         resetUIForNewMail();
         readMailData();
       });
