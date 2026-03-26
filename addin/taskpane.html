@@ -48,7 +48,7 @@
     .folder-input-wrap { position: relative; }
     .folder-input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
     .folder-input:focus { border-color: #0078d4; outline: none; }
-    .folder-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .folder-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; max-height: 300px; overflow-y: auto; z-index: 50; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     .folder-suggestions .sug-item { padding: 6px 8px; font-size: 12px; cursor: pointer; }
     .folder-suggestions .sug-item:hover, .folder-suggestions .sug-item.active { background: #e8f0fe; }
     .folder-suggestions .sug-item .sug-path { color: #999; font-size: 10px; }
@@ -723,9 +723,9 @@ function getKnownFolders() {
   Object.keys(outlookFolderMap).forEach(function(name) {
     if (!folders[name]) folders[name] = outlookFolderMap[name];
   });
-  // 3. Aus localStorage (gelernte Ordner)
+  // 3. Aus localStorage (nur manuell hinzugefuegte Ordner via "+ Ordner")
   try {
-    var learned = JSON.parse(localStorage.getItem('ki_learned_folders') || '{}');
+    var learned = JSON.parse(localStorage.getItem('ki_custom_folders') || '{}');
     Object.keys(learned).forEach(function(name) {
       if (!folders[name]) folders[name] = learned[name];
     });
@@ -815,14 +815,13 @@ function selectFolder(name, id) {
   state.folderId = id;
 }
 
-// Ordner lernen: wenn ein Ordner per Name verschoben wird und wir die ID bekommen
-function learnFolder(name, id) {
+// Manuell hinzugefuegten Ordner speichern (nur via "+ Ordner" Button)
+function saveCustomFolder(name, id) {
   try {
-    var learned = JSON.parse(localStorage.getItem('ki_learned_folders') || '{}');
-    learned[name] = id;
-    localStorage.setItem('ki_learned_folders', JSON.stringify(learned));
-    // Auch in outlookFolderMap fuer die aktuelle Session
-    outlookFolderMap[name] = id;
+    var custom = JSON.parse(localStorage.getItem('ki_custom_folders') || '{}');
+    custom[name] = id || '';
+    localStorage.setItem('ki_custom_folders', JSON.stringify(custom));
+    outlookFolderMap[name] = id || '';
   } catch(e) {}
 }
 
@@ -833,8 +832,7 @@ function addNewFolder() {
     name = prompt('Ordnername eingeben (z.B. "Firmen & Organisationen / Neuer Kunde"):');
   }
   if (!name) return;
-  // In gelernte Ordner speichern
-  learnFolder(name, '');
+  saveCustomFolder(name, '');
   document.getElementById('folder-input').value = name;
   state.folder = name;
   state.folderId = null;
@@ -895,6 +893,8 @@ var gedaechtnis = {
 Office.onReady(function(info) {
   if (info.host === Office.HostType.Outlook) {
     loadConfig();
+    // Einmalig: alte falsche gelernte Ordner loeschen
+    localStorage.removeItem('ki_learned_folders');
     // Sofort: gecachte Ordner aus localStorage laden (0ms, kein API-Call)
     loadCachedFolders();
     // Sofort: Mail-Daten lesen (Office.js, lokal)
@@ -1583,8 +1583,10 @@ async function moveMailToFolder() {
     });
     if (res && res.ok) {
       showToast('Mail verschoben → ' + folderName, 'success');
-      // Ordner lernen fuer die Zukunft
-      learnFolder(folderName, folderId);
+      // Folder-ID merken falls noch nicht bekannt (aber keinen neuen Ordner-Namen lernen)
+      if (folderId && !outlookFolderMap[folderName]) {
+        outlookFolderMap[folderName] = folderId;
+      }
     } else {
       var err = res ? await res.json() : {};
       showToast('Fehler: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
@@ -1627,7 +1629,7 @@ async function findFolderByName(name) {
         if (fRes && fRes.ok) {
           var fData = await fRes.json();
           if (fData.displayName.toLowerCase() === nameLower) {
-            learnFolder(fData.displayName, fData.id);
+            outlookFolderMap[fData.displayName] = fData.id;
             return fData.id;
           }
         }
@@ -1644,7 +1646,7 @@ async function findFolderByName(name) {
       for (var j = 0; j < (topData.value || []).length; j++) {
         var tf = topData.value[j];
         if (tf.displayName.toLowerCase() === nameLower) {
-          learnFolder(tf.displayName, tf.id);
+          outlookFolderMap[tf.displayName] = tf.id;
           return tf.id;
         }
       }
