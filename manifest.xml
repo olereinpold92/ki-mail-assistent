@@ -6,7 +6,7 @@
            xsi:type="MailApp">
 
   <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
-  <Version>1.0.2</Version>
+  <Version>1.0.3</Version>
   <ProviderName>EHC Hamburg</ProviderName>
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="KI Mail Assistent"/>
@@ -71,7 +71,6 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="taskpaneUrl"/>
-                    <SupportsPinning>true</SupportsPinning>
                   </Action>
                 </Control>
               </Group>
