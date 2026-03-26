@@ -490,25 +490,21 @@ function loadCachedFolders() {
 async function loadOutlookFolders() {
   if (!state.graphToken) { populateFolderDropdown(); return; }
   try {
-    // Top-Level Ordner
-    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=100&$select=id,displayName,childFolderCount');
-    if (!res || !res.ok) { populateFolderDropdown(); return; }
-    var data = await res.json();
-    var topFolders = data.value || [];
-
     outlookFolderMap = {};
     var allFolders = [];
 
-    // Rekursiv alle Unterordner laden (bis 4 Ebenen tief)
+    // Rekursiv Ordner laden mit includeHiddenFolders
     async function loadChildren(parentId, parentPath, depth) {
-      if (depth > 4) return;
-      var childRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + parentId + '/childFolders?$top=100&$select=id,displayName,childFolderCount');
-      if (!childRes || !childRes.ok) return;
-      var childData = await childRes.json();
-      var children = childData.value || [];
+      if (depth > 5) return;
+      var url = 'https://graph.microsoft.com/v1.0/me/mailFolders/' + parentId
+        + '/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true';
+      var res = await graphFetch(url);
+      if (!res || !res.ok) return;
+      var data = await res.json();
+      var children = data.value || [];
       for (var j = 0; j < children.length; j++) {
         var c = children[j];
-        var fullPath = parentPath + ' / ' + c.displayName;
+        var fullPath = parentPath ? (parentPath + ' / ' + c.displayName) : c.displayName;
         outlookFolderMap[fullPath] = c.id;
         outlookFolderMap[c.displayName] = c.id;
         allFolders.push({ name: c.displayName, id: c.id, parentName: parentPath, fullPath: fullPath });
@@ -518,8 +514,19 @@ async function loadOutlookFolders() {
       }
     }
 
-    for (var i = 0; i < topFolders.length; i++) {
-      var f = topFolders[i];
+    // Strategie: Alle Well-Known Folders + deren Kinder laden
+    // "msgfolderroot" ist der unsichtbare Root – alle Ordner sind dessen Kinder
+    var rootRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/msgfolderroot/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
+    if (!rootRes || !rootRes.ok) {
+      console.error('Root-Ordner laden fehlgeschlagen');
+      populateFolderDropdown();
+      return;
+    }
+    var rootData = await rootRes.json();
+    var rootFolders = rootData.value || [];
+
+    for (var i = 0; i < rootFolders.length; i++) {
+      var f = rootFolders[i];
       outlookFolderMap[f.displayName] = f.id;
       allFolders.push({ name: f.displayName, id: f.id, parentName: null, fullPath: f.displayName });
       if (f.childFolderCount > 0) {
@@ -527,9 +534,20 @@ async function loadOutlookFolders() {
       }
     }
 
+    // Zusaetzlich: Unterordner von Posteingang/Inbox direkt laden
+    // (manche Setups haben Ordner unter Inbox die nicht unter msgfolderroot erscheinen)
+    var inboxId = outlookFolderMap['Posteingang'] || outlookFolderMap['Inbox'];
+    if (inboxId) {
+      var inboxChildren = allFolders.filter(function(f) { return f.parentName === 'Posteingang' || f.parentName === 'Inbox'; });
+      if (inboxChildren.length === 0) {
+        // Unterordner von Posteingang wurden noch nicht geladen
+        await loadChildren(inboxId, 'Posteingang', 1);
+      }
+    }
+
     populateFolderDropdownReal(allFolders);
     saveFolderCaches({ folders: allFolders, map: outlookFolderMap }, null);
-    console.log(allFolders.length + ' Outlook-Ordner geladen');
+    console.log(allFolders.length + ' Outlook-Ordner geladen (inkl. alle Unterordner)');
   } catch(e) {
     console.error('Ordner laden Fehler:', e);
     populateFolderDropdown();
