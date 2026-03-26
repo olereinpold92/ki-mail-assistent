@@ -328,18 +328,17 @@ async function autoConnect() {
       var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
       state.graphToken = silentResult.accessToken;
       updateConnectionUI(true);
-      // Gecachte Ordner sofort laden (kein API-Call noetig)
-      loadCachedFolders();
-      // Im Hintergrund: Ordner aktualisieren (nur wenn aelter als 1 Stunde)
-      var lastFolderLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
-      if (Date.now() - lastFolderLoad > 3600000) {
+      // Ordner nur aktualisieren wenn aelter als 1 Stunde (sonst Cache reicht)
+      var lastLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
+      if (Date.now() - lastLoad > 3600000) {
+        // Im Hintergrund, nicht blockierend
         loadOutlookFolders();
         loadOneDriveFolders();
       }
       return true;
     }
   } catch(e) {
-    console.log('Auto-Connect fehlgeschlagen (normal beim ersten Mal):', e.message);
+    console.log('Auto-Connect: kein gespeicherter Account');
   }
   return false;
 }
@@ -354,7 +353,9 @@ async function connectMicrosoft() {
         var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
         state.graphToken = silentResult.accessToken;
         updateConnectionUI(true);
-        onGraphConnected();
+        showToast('Mit Microsoft verbunden', 'success');
+        loadOutlookFolders();
+        loadOneDriveFolders();
         return;
       } catch(e) { /* Silent fehlgeschlagen, Popup noetig */ }
     }
@@ -367,7 +368,10 @@ async function connectMicrosoft() {
       state.graphToken = tokenResult.accessToken;
     }
     updateConnectionUI(true);
-    onGraphConnected();
+    showToast('Mit Microsoft verbunden', 'success');
+    // Ordner jetzt frisch laden (manueller Connect)
+    loadOutlookFolders();
+    loadOneDriveFolders();
   } catch(e) {
     console.error('MSAL Fehler:', e);
     if (e.message && e.message.includes('popup')) {
@@ -435,10 +439,7 @@ function updateConnectionUI(connected) {
   }
 }
 
-async function onGraphConnected() {
-  showToast('Mit Microsoft verbunden', 'success');
-  await Promise.all([loadOutlookFolders(), loadOneDriveFolders()]);
-}
+// onGraphConnected nicht mehr noetig – wird direkt in connectMicrosoft/autoConnect gehandelt
 
 /* ========== ORDNER-CACHE (localStorage) ========== */
 function saveFolderCaches(outlookFolders, oneDriveFolders) {
@@ -597,18 +598,15 @@ var gedaechtnis = {
 Office.onReady(function(info) {
   if (info.host === Office.HostType.Outlook) {
     loadConfig();
-    // Automatisch mit Microsoft verbinden (Token aus localStorage)
-    autoConnect().then(function(connected) {
-      if (!connected) {
-        // Nicht verbunden – gecachte Ordner trotzdem laden
-        loadCachedFolders();
-      }
-    });
-    loadGedaechtnis().then(function() {
-      readMailData();
-    });
+    // Sofort: gecachte Ordner aus localStorage laden (0ms, kein API-Call)
+    loadCachedFolders();
+    // Sofort: Mail-Daten lesen (Office.js, lokal)
+    readMailData();
+    // Parallel im Hintergrund: Auto-Connect + Gedaechtnis
+    autoConnect();
+    loadGedaechtnis();
 
-    // Pinning: Wenn der Nutzer eine andere Mail anklickt, automatisch neu laden
+    // Pinning: Wenn der Nutzer eine andere Mail anklickt
     if (Office.context.mailbox.addHandlerAsync) {
       Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function() {
         resetUIForNewMail();
