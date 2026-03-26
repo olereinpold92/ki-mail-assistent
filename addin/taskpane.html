@@ -66,8 +66,9 @@
     .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: white; border-radius: 50%; transition: 0.2s; }
     .toggle input:checked + .toggle-slider { background: #0078d4; }
     .toggle input:checked + .toggle-slider:before { left: 18px; }
-    textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; transition: min-height 0.2s; }
-    textarea.expanded { min-height: 50vh; }
+    textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; }
+    textarea.reply-expandable { min-height: 54px; max-height: 120px; transition: all 0.2s; }
+    textarea.reply-expandable.field-expanded { min-height: 45vh; max-height: 60vh; }
 
     /* Tasks */
     .task-item { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
@@ -230,16 +231,12 @@
         <span id="reply-label">Keine Antwort noetig</span>
       </div>
       <div id="reply-area" style="display:none">
-        <div style="position:relative">
-          <textarea id="reply-text" placeholder="KI-Antwort erscheint hier..." style="min-height:60px"></textarea>
-          <button class="btn btn-outline btn-sm" onclick="toggleReplyExpand()" id="btn-reply-expand" style="position:absolute;top:2px;right:2px;padding:1px 5px;font-size:10px;" title="Erweitern/Verkleinern">&#x2922;</button>
-        </div>
-        <div class="add-task" style="margin-top:4px">
-          <input type="text" id="reply-instruction" placeholder="Anweisung: z.B. 'formeller' oder 'frag nach Termin'" onkeydown="if(event.key==='Enter'){event.preventDefault();refineReply();}">
-          <button class="btn btn-outline btn-sm" onclick="refineReply()" title="KI ueberarbeitet die Antwort">&#x21BB;</button>
-        </div>
+        <div style="font-size:11px;color:#666;margin-bottom:4px;">Antwort-Entwurf:</div>
+        <textarea id="reply-text" class="reply-expandable" placeholder="KI-Antwort erscheint hier..." onclick="expandField(this)" onblur="shrinkField(this)"></textarea>
+        <div style="font-size:11px;color:#666;margin-top:6px;margin-bottom:4px;">Anweisung an KI (optional):</div>
+        <textarea id="reply-instruction" class="reply-expandable" placeholder="z.B. 'formeller' oder 'frag nach dem Termin'" onclick="expandField(this)" onblur="shrinkField(this)"></textarea>
         <div class="btn-row">
-          <button class="btn btn-primary btn-sm" onclick="generateReply()">KI formulieren</button>
+          <button class="btn btn-primary btn-sm" onclick="refineOrGenerate()">KI formulieren</button>
           <button class="btn btn-success btn-sm" onclick="openReplyInOutlook()">In Outlook oeffnen</button>
         </div>
       </div>
@@ -1627,22 +1624,100 @@ function openReplyInOutlook() {
   if (!replyText) { showToast('Keine Antwort vorhanden', 'info'); return; }
   var item = Office.context.mailbox.item;
   if (!item) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
-  // displayReplyForm oeffnet Outlooks native Antwort mit vorausgefuelltem Text
-  item.displayReplyForm(replyText);
+
+  // Text in HTML umwandeln (Absaetze erhalten)
+  var htmlBody = replyText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  htmlBody = '<p>' + htmlBody + '</p>';
+
+  // displayReplyForm mit HTML-Body
+  item.displayReplyForm({
+    htmlBody: htmlBody
+  });
   showToast('Antwort in Outlook geoeffnet', 'success');
 }
 
-// Textfeld erweitern/verkleinern
-function toggleReplyExpand() {
-  var ta = document.getElementById('reply-text');
-  ta.classList.toggle('expanded');
-  // Wenn erweitert: andere Sektionen einklappen
-  if (ta.classList.contains('expanded')) {
-    ['sec-aktion', 'sec-analysis', 'sec-folder', 'sec-attachments', 'sec-tasks', 'sec-feedback'].forEach(function(id) {
-      var el = document.getElementById(id);
-      if (el) el.classList.add('collapsed');
-    });
+// KI formulieren oder ueberarbeiten (ein Button fuer beides)
+async function refineOrGenerate() {
+  var instruction = document.getElementById('reply-instruction').value.trim();
+  var currentReply = document.getElementById('reply-text').value.trim();
+
+  if (currentReply && instruction) {
+    // Ueberarbeiten mit Anweisung
+    await refineReply();
+  } else if (instruction && !currentReply) {
+    // Anweisung als Basis fuer neue Antwort
+    await generateReplyWithInstruction(instruction);
+  } else {
+    // Einfach neu generieren
+    await generateReply();
   }
+}
+
+// Antwort generieren basierend auf Anweisung
+async function generateReplyWithInstruction(instruction) {
+  var claudeKey = localStorage.getItem('ki_claude_key');
+  if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
+
+  document.getElementById('reply-text').value = 'Antwort wird generiert...';
+
+  var stilInfo = gedaechtnis.antwortRegeln ? JSON.stringify(gedaechtnis.antwortRegeln.antwort_stil) : '';
+  var prompt = 'Du schreibst als Ole Reinpold eine Antwort auf diese E-Mail.\n\n'
+    + 'Stil: ' + stilInfo + '\n\n'
+    + 'Urspruengliche Mail:\nVon: ' + state.from + '\nBetreff: ' + state.subject + '\n\n' + (state.body || '').substring(0, 2000) + '\n\n'
+    + 'Oles Anweisung fuer die Antwort: ' + instruction + '\n\n'
+    + 'Schreibe NUR die Antwort, keine Erklaerung. Beginne direkt mit der Anrede. Am Ende KEINE Signatur.';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    var data = await response.json();
+    var reply = data.content[0].text;
+    state.replyText = reply;
+    document.getElementById('reply-text').value = reply;
+    document.getElementById('reply-instruction').value = '';
+  } catch(e) {
+    document.getElementById('reply-text').value = 'Fehler: ' + e.message;
+  }
+}
+
+// Textfelder erweitern/verkleinern bei Klick
+function expandField(el) {
+  // Alle anderen Felder verkleinern
+  document.querySelectorAll('.reply-expandable').forEach(function(ta) {
+    if (ta !== el) ta.classList.remove('field-expanded');
+  });
+  el.classList.add('field-expanded');
+  // Andere Sektionen einklappen
+  ['sec-aktion', 'sec-analysis', 'sec-folder', 'sec-attachments', 'sec-tasks', 'sec-feedback'].forEach(function(id) {
+    var sec = document.getElementById(id);
+    if (sec) sec.classList.add('collapsed');
+  });
+}
+
+function shrinkField(el) {
+  // Nicht sofort verkleinern (damit man noch klicken kann)
+  setTimeout(function() {
+    if (document.activeElement !== el) {
+      el.classList.remove('field-expanded');
+    }
+  }, 200);
 }
 
 /* ========== MAIL VERSCHIEBEN (Graph API) ========== */
