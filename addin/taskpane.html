@@ -58,6 +58,12 @@
     .att-item input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
     .att-item select { flex: 0 0 140px; }
 
+    /* OneDrive Browser */
+    .od-item { padding: 5px 8px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #eee; }
+    .od-item:hover { background: #e8f0fe; }
+    .od-item.selected { background: #d4e8fc; }
+    .od-icon { font-size: 14px; flex-shrink: 0; }
+
     /* Reply */
     .reply-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .toggle { position: relative; width: 36px; height: 20px; }
@@ -216,8 +222,11 @@
     <div class="section-head" onclick="toggleSection('sec-attachments')">Anhaenge <span class="arrow">▼</span></div>
     <div class="section-body">
       <div id="att-list"></div>
+      <div style="font-size:11px;color:#666;margin:6px 0 4px;">OneDrive-Ordner:</div>
+      <div id="onedrive-breadcrumb" style="font-size:11px;margin-bottom:4px;color:#0078d4;cursor:pointer;"></div>
+      <div id="onedrive-browser" style="border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;background:#fafafa;"></div>
       <div class="btn-row">
-        <button class="btn btn-primary btn-sm" onclick="uploadAllAttachments()">Alle in OneDrive ablegen</button>
+        <button class="btn btn-primary btn-sm" onclick="uploadAllAttachments()">Hier ablegen</button>
       </div>
     </div>
   </div>
@@ -1147,16 +1156,6 @@ function populateFolderDropdown() {
 function renderAttachments() {
   var list = document.getElementById('att-list');
   list.innerHTML = '';
-  var onedriveFolders = [];
-  // Echte OneDrive-Ordner bevorzugen, sonst Fallback auf statische Liste
-  if (Object.keys(oneDriveFolderMap).length > 0) {
-    onedriveFolders = Object.keys(oneDriveFolderMap);
-  } else if (gedaechtnis.anhangRegeln && gedaechtnis.anhangRegeln.ordner) {
-    var o = gedaechtnis.anhangRegeln.ordner;
-    Object.keys(o).forEach(function(cat) {
-      o[cat].forEach(function(sub) { onedriveFolders.push(cat + ' / ' + sub); });
-    });
-  }
   state.attachments.forEach(function(att, idx) {
     var div = document.createElement('div');
     div.className = 'att-item';
@@ -1164,16 +1163,12 @@ function renderAttachments() {
     nameInput.type = 'text';
     nameInput.value = att.suggestedName || att.name;
     nameInput.id = 'att-name-' + idx;
-    var folderSel = document.createElement('select');
-    folderSel.id = 'att-folder-' + idx;
-    folderSel.innerHTML = '<option value="">Ordner...</option>';
-    onedriveFolders.forEach(function(f) {
-      folderSel.innerHTML += '<option value="' + f + '"' + (f === att.suggestedFolder ? ' selected' : '') + '>' + f + '</option>';
-    });
+    nameInput.title = 'Dateiname (editierbar)';
     div.appendChild(nameInput);
-    div.appendChild(folderSel);
     list.appendChild(div);
   });
+  // OneDrive-Browser starten
+  browseOneDrive('root');
 }
 
 /* ========== ANALYSE-CACHE (localStorage, pro Mail-ID) ========== */
@@ -1537,6 +1532,74 @@ function saveFeedbackToStorage(correct, text) {
   localStorage.setItem('ki_feedback_log', JSON.stringify(feedbackLog));
 }
 
+/* ========== ONEDRIVE BROWSER ========== */
+var odCurrentFolderId = 'root';
+var odCurrentPath = [];
+var odSelectedFolderId = null;
+
+async function browseOneDrive(folderId, folderName) {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  var browser = document.getElementById('onedrive-browser');
+  browser.innerHTML = '<div style="padding:8px;color:#666;">Laden...</div>';
+
+  var url = folderId === 'root'
+    ? 'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,folder&$top=100&$orderby=name'
+    : 'https://graph.microsoft.com/v1.0/me/drive/items/' + folderId + '/children?$select=id,name,folder&$top=100&$orderby=name';
+
+  try {
+    var res = await graphFetch(url);
+    if (!res || !res.ok) { browser.innerHTML = '<div style="padding:8px;color:#d32f2f;">Fehler beim Laden</div>'; return; }
+    var data = await res.json();
+    var items = (data.value || []).filter(function(i) { return i.folder; });
+
+    // Pfad aktualisieren
+    if (folderId === 'root') {
+      odCurrentPath = [];
+    } else if (folderName) {
+      // Pruefen ob wir zurueck navigieren
+      var existingIdx = odCurrentPath.findIndex(function(p) { return p.id === folderId; });
+      if (existingIdx >= 0) {
+        odCurrentPath = odCurrentPath.slice(0, existingIdx + 1);
+      } else {
+        odCurrentPath.push({ id: folderId, name: folderName });
+      }
+    }
+    odCurrentFolderId = folderId;
+    odSelectedFolderId = folderId;
+
+    // Breadcrumb rendern
+    renderBreadcrumb();
+
+    // Ordner-Liste rendern
+    browser.innerHTML = '';
+    if (items.length === 0) {
+      browser.innerHTML = '<div style="padding:8px;color:#666;font-style:italic;">Keine Unterordner</div>';
+      return;
+    }
+    items.forEach(function(item) {
+      var div = document.createElement('div');
+      div.className = 'od-item';
+      div.innerHTML = '<span class="od-icon">&#128193;</span><span>' + item.name + '</span>';
+      div.onclick = function() { browseOneDrive(item.id, item.name); };
+      browser.appendChild(div);
+    });
+  } catch(e) {
+    browser.innerHTML = '<div style="padding:8px;color:#d32f2f;">Fehler: ' + e.message + '</div>';
+  }
+}
+
+function renderBreadcrumb() {
+  var bc = document.getElementById('onedrive-breadcrumb');
+  var html = '<span onclick="browseOneDrive(\'root\')" style="cursor:pointer">OneDrive</span>';
+  odCurrentPath.forEach(function(p) {
+    html += ' &rsaquo; <span onclick="browseOneDrive(\'' + p.id + '\',\'' + p.name.replace(/'/g, "\\'") + '\')" style="cursor:pointer">' + p.name + '</span>';
+  });
+  bc.innerHTML = html;
+}
+
+// OneDrive-Browser beim Anzeigen der Anhaenge starten
+var origRenderAttachments = typeof renderAttachments === 'function' ? renderAttachments : null;
+
 /* ========== ANTWORT GENERIEREN (Claude API) ========== */
 async function generateReply() {
   var claudeKey = localStorage.getItem('ki_claude_key');
@@ -1899,9 +1962,8 @@ async function uploadAllAttachments() {
   for (var idx = 0; idx < state.attachments.length; idx++) {
     var att = state.attachments[idx];
     var filename = document.getElementById('att-name-' + idx) ? document.getElementById('att-name-' + idx).value.trim() : att.name;
-    var folderSel = document.getElementById('att-folder-' + idx);
-    var folderPath = folderSel ? folderSel.value : '';
-    var folderId = oneDriveFolderMap[folderPath];
+    // Ordner aus dem OneDrive-Browser
+    var folderId = odSelectedFolderId && odSelectedFolderId !== 'root' ? odSelectedFolderId : null;
 
     if (!filename) { fehler++; continue; }
 
