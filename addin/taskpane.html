@@ -224,7 +224,7 @@
       <div id="att-list"></div>
       <div style="font-size:11px;color:#666;margin:6px 0 4px;">OneDrive-Ordner:</div>
       <div id="onedrive-breadcrumb" style="font-size:11px;margin-bottom:4px;color:#0078d4;cursor:pointer;"></div>
-      <div id="onedrive-browser" style="border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;background:#fafafa;"></div>
+      <div id="onedrive-browser" style="border:1px solid #ddd;border-radius:4px;min-height:120px;max-height:50vh;overflow-y:auto;background:#fafafa;"></div>
       <div class="btn-row">
         <button class="btn btn-primary btn-sm" onclick="uploadAllAttachments()">Hier ablegen</button>
       </div>
@@ -838,6 +838,52 @@ function selectFolder(name, id) {
   state.folderId = id;
 }
 
+/* ========== LERN-SYSTEM ========== */
+// Speichert Zuordnungen: Absender-Domain -> Ordner / OneDrive-Pfad
+function learnMailFolder(email, folderName) {
+  if (!email || !folderName) return;
+  var domain = email.split('@')[1] || '';
+  if (!domain) return;
+  try {
+    var rules = JSON.parse(localStorage.getItem('ki_mail_folder_rules') || '{}');
+    rules[domain] = folderName;
+    // Auch die exakte Adresse speichern
+    rules[email.toLowerCase()] = folderName;
+    localStorage.setItem('ki_mail_folder_rules', JSON.stringify(rules));
+    console.log('Gelernt: ' + domain + ' → ' + folderName);
+  } catch(e) {}
+}
+
+function learnAttachmentFolder(email, onedrivePath) {
+  if (!email || !onedrivePath) return;
+  var domain = email.split('@')[1] || '';
+  if (!domain) return;
+  try {
+    var rules = JSON.parse(localStorage.getItem('ki_attachment_folder_rules') || '{}');
+    rules[domain] = onedrivePath;
+    rules[email.toLowerCase()] = onedrivePath;
+    localStorage.setItem('ki_attachment_folder_rules', JSON.stringify(rules));
+    console.log('Gelernt (Anhang): ' + domain + ' → ' + onedrivePath);
+  } catch(e) {}
+}
+
+function getLearnedMailFolder(email) {
+  if (!email) return null;
+  try {
+    var rules = JSON.parse(localStorage.getItem('ki_mail_folder_rules') || '{}');
+    // Erst exakte Adresse, dann Domain
+    return rules[email.toLowerCase()] || rules[email.split('@')[1]] || null;
+  } catch(e) { return null; }
+}
+
+function getLearnedAttachmentFolder(email) {
+  if (!email) return null;
+  try {
+    var rules = JSON.parse(localStorage.getItem('ki_attachment_folder_rules') || '{}');
+    return rules[email.toLowerCase()] || rules[email.split('@')[1]] || null;
+  } catch(e) { return null; }
+}
+
 // Gefundene Folder-IDs in localStorage speichern
 function saveFolderIdCache() {
   try {
@@ -1255,6 +1301,15 @@ async function analyzeEmail() {
     + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
     + '=== GESPERRTE DOMAINS ===\n'
     + (function() { try { var b = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]'); return b.length > 0 ? b.join(', ') + '\nMails von diesen Domains: immer loeschen + absender_sperren: true\n\n' : 'Keine\n\n'; } catch(e) { return 'Keine\n\n'; } })()
+    + '=== GELERNTE ZUORDNUNGEN (aus frueheren Entscheidungen) ===\n'
+    + (function() {
+      try {
+        var rules = JSON.parse(localStorage.getItem('ki_mail_folder_rules') || '{}');
+        var entries = Object.keys(rules).filter(function(k) { return k.indexOf('@') === -1; }); // Nur Domains
+        if (entries.length === 0) return 'Noch keine gelernten Zuordnungen.\n\n';
+        return entries.map(function(d) { return d + ' → ' + rules[d]; }).join('\n') + '\n\nBeachte diese Zuordnungen bei deiner Ordner-Empfehlung!\n\n';
+      } catch(e) { return 'Keine\n\n'; }
+    })()
     + '=== VERFUEGBARE OUTLOOK-ORDNER ===\n'
     + buildFolderList().join(', ') + '\n'
     + 'Waehle bei Aktion "ablage" IMMER einen dieser Ordner. Bei ToDo/Nachhalten wird der Ordner automatisch gesetzt.\n\n'
@@ -1812,10 +1867,11 @@ async function moveMailToFolder() {
     });
     if (res && res.ok) {
       showToast('Mail verschoben → ' + folderName, 'success');
-      // Folder-ID merken falls noch nicht bekannt (aber keinen neuen Ordner-Namen lernen)
-      if (folderId && !outlookFolderMap[folderName]) {
-        outlookFolderMap[folderName] = folderId;
-      }
+      // Folder-ID merken
+      if (folderId) outlookFolderMap[folderName] = folderId;
+      saveFolderIdCache();
+      // Lern-System: Absender → Ordner merken
+      learnMailFolder(state.fromEmail, folderName);
     } else {
       var err = res ? await res.json() : {};
       showToast('Fehler: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
@@ -2010,6 +2066,9 @@ async function uploadAllAttachments() {
   }
   if (fehler === 0) {
     showToast(erfolg + ' Anhang/Anhaenge in OneDrive abgelegt', 'success');
+    // Lern-System: Absender → OneDrive-Pfad merken
+    var pathStr = odCurrentPath.map(function(p) { return p.name; }).join(' / ');
+    if (pathStr) learnAttachmentFolder(state.fromEmail, pathStr);
   } else {
     showToast(erfolg + ' hochgeladen, ' + fehler + ' fehlgeschlagen', 'error');
   }
