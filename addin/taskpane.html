@@ -227,7 +227,7 @@
       </div>
       <div id="onedrive-browser-wrap">
         <input type="text" id="od-search" class="folder-input" placeholder="Ordner suchen..." oninput="onOdSearch()" style="margin-bottom:4px;font-size:11px;padding:4px 6px;">
-        <div id="od-search-results" style="display:none;border:1px solid #ddd;border-radius:4px;max-height:168px;overflow-y:auto;background:#fafafa;margin-bottom:4px;"></div>
+        <div id="od-search-results" style="display:none;position:fixed;background:white;border:1px solid #ddd;border-radius:4px;max-height:60vh;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         <div id="onedrive-breadcrumb" style="font-size:11px;margin:4px 0;color:#0078d4;cursor:pointer;"></div>
         <div id="onedrive-browser" style="border:1px solid #ddd;border-radius:4px;max-height:168px;overflow-y:auto;background:#fafafa;"></div>
         <div class="btn-row">
@@ -952,6 +952,10 @@ document.addEventListener('click', function(e) {
   if (!e.target.closest('.folder-input-wrap')) {
     var sug = document.getElementById('folder-suggestions');
     if (sug) sug.style.display = 'none';
+  }
+  if (!e.target.closest('#od-search') && !e.target.closest('#od-search-results')) {
+    var odr = document.getElementById('od-search-results');
+    if (odr) odr.style.display = 'none';
   }
 });
 
@@ -1707,37 +1711,48 @@ function onOdSearch() {
   // Kurz warten damit nicht bei jedem Tastendruck gesucht wird
   odSearchTimeout = setTimeout(async function() {
     if (!state.graphToken) return;
-    resultsDiv.innerHTML = '<div style="padding:6px;color:#666;font-size:11px;">Suche...</div>';
+
+    // Position berechnen
+    var searchInput = document.getElementById('od-search');
+    var rect = searchInput.getBoundingClientRect();
+    resultsDiv.style.left = rect.left + 'px';
+    resultsDiv.style.top = rect.bottom + 'px';
+    resultsDiv.style.width = Math.max(rect.width, 300) + 'px';
+
+    resultsDiv.innerHTML = '<div style="padding:8px;color:#666;font-size:11px;">Suche...</div>';
     resultsDiv.style.display = 'block';
     browserDiv.style.display = 'none';
     bcDiv.style.display = 'none';
 
     try {
-      // Graph API: OneDrive Suche nach Ordnern
-      var res = await graphFetch("https://graph.microsoft.com/v1.0/me/drive/root/search(q='" + encodeURIComponent(q) + "')?$select=id,name,folder,parentReference&$top=20");
-      if (!res || !res.ok) { resultsDiv.innerHTML = '<div style="padding:6px;color:#d32f2f;">Suche fehlgeschlagen</div>'; return; }
+      var res = await graphFetch("https://graph.microsoft.com/v1.0/me/drive/root/search(q='" + encodeURIComponent(q) + "')?$select=id,name,folder,parentReference&$top=30");
+      if (!res || !res.ok) { resultsDiv.innerHTML = '<div style="padding:8px;color:#d32f2f;">Suche fehlgeschlagen</div>'; return; }
       var data = await res.json();
       var folders = (data.value || []).filter(function(i) { return i.folder; });
 
       if (folders.length === 0) {
-        resultsDiv.innerHTML = '<div style="padding:6px;color:#666;font-size:11px;">Kein Ordner gefunden</div>';
+        resultsDiv.innerHTML = '<div style="padding:8px;color:#666;font-size:11px;">Kein Ordner gefunden</div>';
         return;
       }
 
       resultsDiv.innerHTML = '';
       folders.forEach(function(f) {
-        var path = f.parentReference && f.parentReference.path
-          ? f.parentReference.path.replace('/drive/root:', '').replace(/\//g, ' / ')
+        var rawPath = f.parentReference && f.parentReference.path
+          ? f.parentReference.path.replace('/drive/root:', '').replace(/^\//, '')
           : '';
+        var fullPath = rawPath ? rawPath.replace(/\//g, ' / ') + ' / ' + f.name : f.name;
+
         var div = document.createElement('div');
-        div.className = 'od-item';
-        div.innerHTML = '<span class="od-icon">&#128193;</span><div><div>' + f.name + '</div><div style="font-size:10px;color:#999;">' + (path ? path + ' / ' + f.name : f.name) + '</div></div>';
+        div.style.cssText = 'padding:8px 10px;cursor:pointer;border-bottom:1px solid #eee;';
+        div.onmouseover = function() { div.style.background = '#e8f0fe'; };
+        div.onmouseout = function() { div.style.background = 'white'; };
+        div.innerHTML = '<div style="font-size:12px;font-weight:600;">&#128193; ' + f.name + '</div>'
+          + '<div style="font-size:11px;color:#666;margin-top:2px;word-break:break-all;">' + fullPath + '</div>';
         div.onclick = function() {
-          // Ordner auswaehlen
           odSelectedFolderId = f.id;
           odCurrentPath = [];
-          if (path) {
-            path.split(' / ').filter(Boolean).forEach(function(p) { odCurrentPath.push({ id: '', name: p.trim() }); });
+          if (rawPath) {
+            rawPath.split('/').filter(Boolean).forEach(function(p) { odCurrentPath.push({ id: '', name: p.trim() }); });
           }
           odCurrentPath.push({ id: f.id, name: f.name });
           document.getElementById('od-search').value = '';
@@ -1749,7 +1764,7 @@ function onOdSearch() {
         resultsDiv.appendChild(div);
       });
     } catch(e) {
-      resultsDiv.innerHTML = '<div style="padding:6px;color:#d32f2f;">Fehler: ' + e.message + '</div>';
+      resultsDiv.innerHTML = '<div style="padding:8px;color:#d32f2f;">Fehler: ' + e.message + '</div>';
     }
   }, 300);
 }
