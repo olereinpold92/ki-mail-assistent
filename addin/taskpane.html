@@ -44,6 +44,15 @@
     /* Folder select */
     select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
 
+    /* Folder autocomplete */
+    .folder-input-wrap { position: relative; }
+    .folder-input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
+    .folder-input:focus { border-color: #0078d4; outline: none; }
+    .folder-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .folder-suggestions .sug-item { padding: 6px 8px; font-size: 12px; cursor: pointer; }
+    .folder-suggestions .sug-item:hover, .folder-suggestions .sug-item.active { background: #e8f0fe; }
+    .folder-suggestions .sug-item .sug-path { color: #999; font-size: 10px; }
+
     /* Attachments */
     .att-item { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; }
     .att-item input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
@@ -195,11 +204,12 @@
   <div class="section" id="sec-folder">
     <div class="section-head" onclick="toggleSection('sec-folder')">Ordner <span class="arrow">▼</span></div>
     <div class="section-body">
-      <select id="folder-select"><option value="">Wird geladen...</option></select>
+      <div class="folder-input-wrap">
+        <input type="text" class="folder-input" id="folder-input" placeholder="Ordner eingeben..." autocomplete="off" oninput="onFolderInput()" onfocus="onFolderInput()" onkeydown="onFolderKeydown(event)">
+        <div class="folder-suggestions" id="folder-suggestions"></div>
+      </div>
       <div class="btn-row">
         <button class="btn btn-primary btn-sm" onclick="moveMailToFolder()">Mail verschieben</button>
-        <button class="btn btn-outline btn-sm" onclick="refreshFolders()">Ordner neu laden</button>
-        <button class="btn btn-outline btn-sm" onclick="debugFolders()">Debug Ordner</button>
       </div>
     </div>
   </div>
@@ -539,9 +549,8 @@ function saveFolderCaches(outlookFolders, oneDriveFolders) {
 function loadCachedFolders() {
   try {
     var of = JSON.parse(localStorage.getItem('ki_outlook_folders') || 'null');
-    if (of && of.folders && of.folders.length > 0) {
-      outlookFolderMap = of.map || {};
-      populateFolderDropdownReal(of.folders);
+    if (of && of.map) {
+      outlookFolderMap = of.map;
     }
     var odf = JSON.parse(localStorage.getItem('ki_onedrive_folders') || 'null');
     if (odf) {
@@ -643,42 +652,131 @@ async function loadOutlookFolders() {
       outlookFolderMap[path] = f.id;
     });
 
-    populateFolderDropdownReal(allFolders);
+    // Ordner-Map in localStorage speichern (das Lernsystem)
     saveFolderCaches({ folders: allFolders, map: outlookFolderMap }, null);
     console.log(allFolders.length + ' Outlook-Ordner entdeckt (Rueckwaerts-Methode)');
   } catch(e) {
     console.error('Ordner laden Fehler:', e);
-    populateFolderDropdown();
   }
 }
 
-function populateFolderDropdownReal(folders) {
-  var sel = document.getElementById('folder-select');
-  sel.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+/* ========== ORDNER AUTOCOMPLETE ========== */
+function getKnownFolders() {
+  // Alle bekannten Ordner aus: API-Entdeckung + manuell gelernte
+  var folders = {};
+  // Aus outlookFolderMap (API)
+  Object.keys(outlookFolderMap).forEach(function(name) {
+    folders[name] = outlookFolderMap[name];
+  });
+  // Aus localStorage (gelernte Ordner)
+  try {
+    var learned = JSON.parse(localStorage.getItem('ki_learned_folders') || '{}');
+    Object.keys(learned).forEach(function(name) {
+      if (!folders[name]) folders[name] = learned[name];
+    });
+  } catch(e) {}
+  return folders;
+}
 
-  // Einfache, flache Liste – jeder Ordner als eigene Option
-  // Einrueckung per Pfad zeigt die Hierarchie
-  // System-Ordner die man nie braucht ausblenden
+function getFilteredFolderList(query) {
+  var folders = getKnownFolders();
   var hideFolders = ['Synchronisierungsprobleme', 'RSS-Feeds', 'Postausgang', 'Junk-E-Mail',
-    'Entwuerfe', 'Entwürfe', 'Gelöschte Elemente', 'Geloeschte Elemente', 'Gesendete Elemente'];
+    'Entwürfe', 'Gelöschte Elemente', 'Gesendete Elemente', 'Social Activity',
+    'Top of Information Store', 'Posteingang', 'Archiv', 'Verlauf der Unterhaltung'];
 
-  folders.forEach(function(f) {
-    var name = f.fullPath || f.name;
+  var results = [];
+  var q = (query || '').toLowerCase();
+  Object.keys(folders).forEach(function(name) {
     // System-Ordner ausblenden
     var hide = false;
-    hideFolders.forEach(function(h) {
-      if (name.indexOf(h) !== -1) hide = true;
-    });
+    hideFolders.forEach(function(h) { if (name.indexOf(h) !== -1) hide = true; });
     if (hide) return;
-
-    var opt = document.createElement('option');
-    opt.value = f.id;
-    opt.textContent = name;
-    sel.appendChild(opt);
+    // Filter
+    if (!q || name.toLowerCase().indexOf(q) !== -1) {
+      results.push({ name: name, id: folders[name] });
+    }
   });
-
-  console.log('Dropdown befuellt mit ' + (sel.options.length - 1) + ' Ordnern');
+  // Sortieren: kuerzere Namen zuerst, dann alphabetisch
+  results.sort(function(a, b) { return a.name.length - b.name.length || a.name.localeCompare(b.name); });
+  return results;
 }
+
+var sugActiveIdx = -1;
+
+function onFolderInput() {
+  var input = document.getElementById('folder-input');
+  var q = input.value.trim();
+  var results = getFilteredFolderList(q);
+  var sug = document.getElementById('folder-suggestions');
+  sugActiveIdx = -1;
+
+  if (results.length === 0 && q.length > 0) {
+    // Neuer Ordner – zeige Option zum Erstellen
+    sug.innerHTML = '<div class="sug-item" style="color:#666;font-style:italic" onclick="learnNewFolder()">Neuer Ordner: "' + q + '" (wird beim Verschieben gelernt)</div>';
+    sug.style.display = 'block';
+    return;
+  }
+  if (results.length === 0) { sug.style.display = 'none'; return; }
+
+  sug.innerHTML = '';
+  results.slice(0, 15).forEach(function(f, i) {
+    var div = document.createElement('div');
+    div.className = 'sug-item';
+    div.textContent = f.name;
+    div.dataset.id = f.id;
+    div.dataset.name = f.name;
+    div.onclick = function() { selectFolder(f.name, f.id); };
+    sug.appendChild(div);
+  });
+  sug.style.display = 'block';
+}
+
+function onFolderKeydown(e) {
+  var sug = document.getElementById('folder-suggestions');
+  var items = sug.querySelectorAll('.sug-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    sugActiveIdx = Math.min(sugActiveIdx + 1, items.length - 1);
+    items.forEach(function(it, i) { it.classList.toggle('active', i === sugActiveIdx); });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    sugActiveIdx = Math.max(sugActiveIdx - 1, 0);
+    items.forEach(function(it, i) { it.classList.toggle('active', i === sugActiveIdx); });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (sugActiveIdx >= 0 && items[sugActiveIdx]) {
+      selectFolder(items[sugActiveIdx].dataset.name, items[sugActiveIdx].dataset.id);
+    }
+  } else if (e.key === 'Escape') {
+    sug.style.display = 'none';
+  }
+}
+
+function selectFolder(name, id) {
+  document.getElementById('folder-input').value = name;
+  document.getElementById('folder-suggestions').style.display = 'none';
+  state.folder = name;
+  state.folderId = id;
+}
+
+// Ordner lernen: wenn ein Ordner per Name verschoben wird und wir die ID bekommen
+function learnFolder(name, id) {
+  try {
+    var learned = JSON.parse(localStorage.getItem('ki_learned_folders') || '{}');
+    learned[name] = id;
+    localStorage.setItem('ki_learned_folders', JSON.stringify(learned));
+    // Auch in outlookFolderMap fuer die aktuelle Session
+    outlookFolderMap[name] = id;
+  } catch(e) {}
+}
+
+// Klick ausserhalb schliesst Suggestions
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.folder-input-wrap')) {
+    var sug = document.getElementById('folder-suggestions');
+    if (sug) sug.style.display = 'none';
+  }
+});
 
 /* ========== ONEDRIVE ORDNER LADEN ========== */
 async function loadOneDriveFolders() {
@@ -810,7 +908,8 @@ function resetUIForNewMail() {
   state.aktion = '';
   document.getElementById('block-sender-toggle').checked = false;
   document.getElementById('block-sender-area').style.display = 'none';
-  document.getElementById('folder-select').selectedIndex = 0;
+  document.getElementById('folder-input').value = '';
+  state.folderId = null;
   document.getElementById('reply-toggle').checked = false;
   document.getElementById('reply-label').textContent = 'Keine Antwort noetig';
   document.getElementById('reply-area').style.display = 'none';
@@ -944,14 +1043,10 @@ function onMailLoaded() {
 
 /* ========== ORDNER DROPDOWN ========== */
 function populateFolderDropdown() {
-  var sel = document.getElementById('folder-select');
-  sel.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+  // Legacy-Fallback: Ordner aus gedaechtnis laden wenn API nicht verfuegbar
   if (gedaechtnis.ordnerRegeln && gedaechtnis.ordnerRegeln.bekannte_ordner) {
     gedaechtnis.ordnerRegeln.bekannte_ordner.forEach(function(f) {
-      var opt = document.createElement('option');
-      opt.value = f;
-      opt.textContent = f;
-      sel.appendChild(opt);
+      if (!outlookFolderMap[f]) outlookFolderMap[f] = '';
     });
   }
 }
@@ -1167,23 +1262,15 @@ function applyAnalysis(a) {
     state.prio = a.prioritaet;
   }
 
-  // Ordner im Dropdown auswaehlen
+  // Ordner ins Textfeld setzen
   if (zielOrdner) {
     state.folder = zielOrdner;
-    var sel = document.getElementById('folder-select');
-    var found = false;
-    for (var i = 0; i < sel.options.length; i++) {
-      var optText = sel.options[i].textContent || '';
-      if (sel.options[i].value === zielOrdner || optText.indexOf(zielOrdner) !== -1 || zielOrdner.indexOf(optText.trim()) !== -1) {
-        sel.selectedIndex = i;
-        found = true;
-        break;
-      }
-    }
-    if (!found && a.ordner) {
-      // Fallback: KI-Vorschlag als Text anzeigen
-      state.folder = a.ordner;
-    }
+    state.folderId = outlookFolderMap[zielOrdner] || null;
+    document.getElementById('folder-input').value = zielOrdner;
+  } else if (a.ordner) {
+    state.folder = a.ordner;
+    state.folderId = outlookFolderMap[a.ordner] || null;
+    document.getElementById('folder-input').value = a.ordner;
   }
 
   // Aktions-Button aktivieren
@@ -1259,14 +1346,10 @@ function setAktion(btn) {
     'nachhalten': '02_Nachhalten'
   };
   if (aktionOrdnerMap[state.aktion]) {
-    var sel = document.getElementById('folder-select');
     var ziel = aktionOrdnerMap[state.aktion];
-    for (var i = 0; i < sel.options.length; i++) {
-      if ((sel.options[i].textContent || '').indexOf(ziel) !== -1) {
-        sel.selectedIndex = i;
-        break;
-      }
-    }
+    document.getElementById('folder-input').value = ziel;
+    state.folder = ziel;
+    state.folderId = outlookFolderMap[ziel] || null;
   }
   // Sperren-Bereich anzeigen wenn loeschen gewaehlt
   updateBlockSenderUI();
@@ -1399,12 +1482,24 @@ async function generateReply() {
 
 /* ========== MAIL VERSCHIEBEN (Graph API) ========== */
 async function moveMailToFolder() {
-  var sel = document.getElementById('folder-select');
-  var folderId = sel.value;
-  var folderName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
-  if (!folderId) { showToast('Bitte erst einen Ordner waehlen', 'info'); return; }
+  var folderName = document.getElementById('folder-input').value.trim();
+  if (!folderName) { showToast('Bitte erst einen Ordner eingeben', 'info'); return; }
   if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
   if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
+
+  // Folder-ID finden: aus bekannten Ordnern oder per API-Suche
+  var folderId = state.folderId || outlookFolderMap[folderName];
+
+  // Fallback: per Graph API nach dem Ordnernamen suchen
+  if (!folderId) {
+    showToast('Ordner "' + folderName + '" wird gesucht...', 'info');
+    folderId = await findFolderByName(folderName);
+  }
+
+  if (!folderId) {
+    showToast('Ordner "' + folderName + '" nicht gefunden', 'error');
+    return;
+  }
 
   try {
     showToast('Mail wird verschoben...', 'info');
@@ -1414,6 +1509,8 @@ async function moveMailToFolder() {
     });
     if (res && res.ok) {
       showToast('Mail verschoben → ' + folderName, 'success');
+      // Ordner lernen fuer die Zukunft
+      learnFolder(folderName, folderId);
     } else {
       var err = res ? await res.json() : {};
       showToast('Fehler: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
@@ -1421,6 +1518,42 @@ async function moveMailToFolder() {
   } catch(e) {
     showToast('Verschieben fehlgeschlagen: ' + e.message, 'error');
   }
+}
+
+// Ordner per Name suchen (durchsucht alle Ordner rekursiv)
+async function findFolderByName(name) {
+  // Erst in lokaler Map suchen (teilweise Matches)
+  var folders = getKnownFolders();
+  var found = Object.keys(folders).find(function(k) {
+    return k.toLowerCase() === name.toLowerCase() || k.toLowerCase().endsWith(name.toLowerCase());
+  });
+  if (found) return folders[found];
+
+  // Per API suchen: alle Top-Level durchgehen
+  try {
+    var topRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=200&$select=id,displayName,childFolderCount');
+    if (!topRes || !topRes.ok) return null;
+    var topData = await topRes.json();
+    for (var i = 0; i < (topData.value || []).length; i++) {
+      var f = topData.value[i];
+      if (f.displayName.toLowerCase() === name.toLowerCase()) {
+        learnFolder(name, f.id);
+        return f.id;
+      }
+      // Auch in childFolders suchen (per Filter)
+      if (f.childFolderCount > 0) {
+        var childRes = await graphFetch("https://graph.microsoft.com/v1.0/me/mailFolders/" + f.id + "/childFolders?$filter=displayName eq '" + encodeURIComponent(name) + "'&$select=id,displayName");
+        if (childRes && childRes.ok) {
+          var childData = await childRes.json();
+          if (childData.value && childData.value.length > 0) {
+            learnFolder(name, childData.value[0].id);
+            return childData.value[0].id;
+          }
+        }
+      }
+    }
+  } catch(e) { console.error('Ordner-Suche Fehler:', e); }
+  return null;
 }
 
 /* ========== MAIL LOESCHEN + ABSENDER SPERREN (Graph API) ========== */
@@ -1585,16 +1718,12 @@ async function executeAll() {
   // Sonderfall: Sofort – bleibt im Posteingang, nichts verschieben
   // (nur Antwort senden und Anhaenge ablegen falls noetig)
 
-  // 1. Mail verschieben (wenn Ordner gewaehlt und nicht "sofort")
-  var folderSel = document.getElementById('folder-select');
-  if (folderSel.value && state.aktion !== 'sofort') {
+  // 1. Mail verschieben (wenn Ordner eingegeben und nicht "sofort")
+  var folderName = document.getElementById('folder-input').value.trim();
+  if (folderName && state.aktion !== 'sofort') {
     steps.push('Mail verschieben');
     try {
-      var moveRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
-        method: 'POST',
-        body: JSON.stringify({ destinationId: folderSel.value })
-      });
-      if (!moveRes || !moveRes.ok) errors.push('Mail verschieben fehlgeschlagen');
+      await moveMailToFolder();
     } catch(e) { errors.push('Mail verschieben: ' + e.message); }
   }
 
