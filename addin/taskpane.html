@@ -167,6 +167,12 @@
         <button class="prio-btn" data-a="ablage" onclick="setAktion(this)">Ablage</button>
         <button class="prio-btn" data-a="loeschen" onclick="setAktion(this)">Loeschen</button>
       </div>
+      <div id="block-sender-area" style="display:none; margin-top:8px; padding:6px 8px; background:#fff3cd; border-radius:4px;">
+        <div class="reply-toggle">
+          <label class="toggle"><input type="checkbox" id="block-sender-toggle" onchange="onBlockToggle()"><span class="toggle-slider"></span></label>
+          <span id="block-sender-label" style="font-size:12px;">Domain sperren: <strong id="block-domain"></strong></span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -685,6 +691,10 @@ function resetUIForNewMail() {
   // UI zuruecksetzen
   document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
   document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  state.blockSender = false;
+  state.aktion = '';
+  document.getElementById('block-sender-toggle').checked = false;
+  document.getElementById('block-sender-area').style.display = 'none';
   document.getElementById('folder-select').selectedIndex = 0;
   document.getElementById('reply-toggle').checked = false;
   document.getElementById('reply-label').textContent = 'Keine Antwort noetig';
@@ -946,6 +956,8 @@ async function analyzeEmail() {
     + 'Anhaenge:\n' + attInfo + '\n'
     + 'Heutiges Datum fuer Dateinamen: ' + heute + '\n\n'
     + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
+    + '=== GESPERRTE DOMAINS ===\n'
+    + (function() { try { var b = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]'); return b.length > 0 ? b.join(', ') + '\nMails von diesen Domains: immer loeschen + absender_sperren: true\n\n' : 'Keine\n\n'; } catch(e) { return 'Keine\n\n'; } })()
     + '=== AKTIONS-SYSTEM ===\n'
     + 'Waehle GENAU EINE Aktion fuer diese Mail:\n'
     + '- "sofort": Muss Ole sofort erledigen, bleibt im Posteingang\n'
@@ -958,6 +970,7 @@ async function analyzeEmail() {
     + 'Antworte NUR als JSON (kein Markdown, kein Text drumherum):\n'
     + '{\n'
     + '  "aktion": "sofort|todo_wichtig|todo_nth|nachhalten|ablage|loeschen",\n'
+    + '  "absender_sperren": true/false (true bei Spam, unerwuenschter Werbung, irrelevanten Newslettern – sperrt die ganze Domain),\n'
     + '  "analyse": "2-3 Saetze: Worum geht es, was wird erwartet",\n'
     + '  "ordner": "Genauer Ziel-Ordnername (bei ablage: z.B. Firmen & Organisationen / Hafenklinik. Bei todo/nachhalten/loeschen: wird automatisch gesetzt)",\n'
     + '  "antwort_noetig": true/false,\n'
@@ -1065,6 +1078,16 @@ function applyAnalysis(a) {
     });
   }
 
+  // Absender sperren (KI-Vorschlag)
+  if (a.absender_sperren) {
+    state.blockSender = true;
+    document.getElementById('block-sender-toggle').checked = true;
+  } else {
+    state.blockSender = false;
+    document.getElementById('block-sender-toggle').checked = false;
+  }
+  updateBlockSenderUI();
+
   // Antwort
   if (a.antwort_noetig !== undefined) {
     state.replyNeeded = a.antwort_noetig;
@@ -1130,6 +1153,22 @@ function setAktion(btn) {
       }
     }
   }
+  // Sperren-Bereich anzeigen wenn loeschen gewaehlt
+  updateBlockSenderUI();
+}
+
+function updateBlockSenderUI() {
+  var area = document.getElementById('block-sender-area');
+  if (state.fromEmail) {
+    var domain = state.fromEmail.split('@')[1] || '';
+    document.getElementById('block-domain').textContent = domain;
+    // Immer anzeigen (nicht nur bei loeschen), aber bei loeschen vorausgewaehlt
+    area.style.display = 'block';
+  }
+}
+
+function onBlockToggle() {
+  state.blockSender = document.getElementById('block-sender-toggle').checked;
 }
 
 function onReplyToggle() {
@@ -1269,39 +1308,38 @@ async function moveMailToFolder() {
 }
 
 /* ========== MAIL LOESCHEN + ABSENDER SPERREN (Graph API) ========== */
-async function deleteAndBlockSender() {
+async function deleteMailAndOptionalBlock() {
   if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
   if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
 
   try {
-    // 1. Absender zur Blockliste hinzufuegen
-    if (state.fromEmail) {
-      showToast('Absender wird gesperrt...', 'info');
-      // Junk-Mail-Regel: Absender blockieren via Graph API
-      var blockRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/junkemail/messages', {
-        method: 'GET'
-      });
-      // Absender auf Blockliste setzen via junkEmailConfiguration (falls verfuegbar)
-      // Fallback: Mail in Junk verschieben, Outlook lernt daraus
-    }
-
-    // 2. Mail loeschen (in Geloeschte Elemente verschieben)
+    // 1. Mail loeschen (in Geloeschte Elemente verschieben)
     showToast('Mail wird geloescht...', 'info');
     var delRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
       method: 'POST',
       body: JSON.stringify({ destinationId: 'deleteditems' })
     });
-    if (delRes && delRes.ok) {
-      showToast('Mail geloescht & Absender ' + state.fromEmail + ' gesperrt', 'success');
-      // Absender in lokaler Blockliste speichern (fuer zukuenftige Auto-Erkennung)
-      var blocked = JSON.parse(localStorage.getItem('ki_blocked_senders') || '[]');
-      if (state.fromEmail && blocked.indexOf(state.fromEmail) === -1) {
-        blocked.push(state.fromEmail);
-        localStorage.setItem('ki_blocked_senders', JSON.stringify(blocked));
-      }
-    } else {
+    if (!delRes || !delRes.ok) {
       var err = delRes ? await delRes.json() : {};
       showToast('Loeschen fehlgeschlagen: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
+      return;
+    }
+
+    // 2. Domain sperren (nur wenn Toggle an)
+    if (state.blockSender && state.fromEmail) {
+      var domain = state.fromEmail.split('@')[1] || '';
+      if (domain) {
+        var blocked = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]');
+        if (blocked.indexOf(domain) === -1) {
+          blocked.push(domain);
+          localStorage.setItem('ki_blocked_domains', JSON.stringify(blocked));
+        }
+        showToast('Mail geloescht & Domain ' + domain + ' gesperrt', 'success');
+      } else {
+        showToast('Mail geloescht', 'success');
+      }
+    } else {
+      showToast('Mail geloescht', 'success');
     }
   } catch(e) {
     showToast('Loeschen fehlgeschlagen: ' + e.message, 'error');
@@ -1417,8 +1455,8 @@ async function executeAll() {
 
   // Sonderfall: Loeschen + Absender sperren
   if (state.aktion === 'loeschen') {
-    steps.push('Loeschen & Absender sperren');
-    try { await deleteAndBlockSender(); } catch(e) { errors.push('Loeschen: ' + e.message); }
+    steps.push(state.blockSender ? 'Loeschen & Domain sperren' : 'Loeschen');
+    try { await deleteMailAndOptionalBlock(); } catch(e) { errors.push('Loeschen: ' + e.message); }
     saveFeedbackToStorage(true, '');
     if (errors.length === 0) {
       showToast('Mail geloescht & Absender gesperrt', 'success');
