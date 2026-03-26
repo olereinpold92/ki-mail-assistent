@@ -48,7 +48,7 @@
     .folder-input-wrap { position: relative; }
     .folder-input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white; }
     .folder-input:focus { border-color: #0078d4; outline: none; }
-    .folder-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; min-height: 150px; max-height: 400px; overflow-y: auto; z-index: 50; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .folder-suggestions { position: fixed; background: white; border: 1px solid #ddd; border-radius: 4px; min-height: 120px; max-height: 50vh; overflow-y: auto; z-index: 200; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
     .folder-suggestions .sug-item { padding: 6px 8px; font-size: 12px; cursor: pointer; }
     .folder-suggestions .sug-item:hover, .folder-suggestions .sug-item.active { background: #e8f0fe; }
     .folder-suggestions .sug-item .sug-path { color: #999; font-size: 10px; }
@@ -550,9 +550,18 @@ function saveFolderCaches(outlookFolders, oneDriveFolders) {
 
 function loadCachedFolders() {
   try {
+    // Gecachte Folder-IDs laden
+    var cachedIds = JSON.parse(localStorage.getItem('ki_folder_ids') || 'null');
+    if (cachedIds) {
+      Object.keys(cachedIds).forEach(function(k) {
+        if (cachedIds[k]) outlookFolderMap[k] = cachedIds[k];
+      });
+    }
     var of = JSON.parse(localStorage.getItem('ki_outlook_folders') || 'null');
     if (of && of.map) {
-      outlookFolderMap = of.map;
+      Object.keys(of.map).forEach(function(k) {
+        if (of.map[k]) outlookFolderMap[k] = of.map[k];
+      });
     }
     var odf = JSON.parse(localStorage.getItem('ki_onedrive_folders') || 'null');
     if (odf) {
@@ -766,6 +775,12 @@ function onFolderInput() {
   var sug = document.getElementById('folder-suggestions');
   sugActiveIdx = -1;
 
+  // Position der Suggestions-Box berechnen (fixed, nicht relativ)
+  var rect = input.getBoundingClientRect();
+  sug.style.left = rect.left + 'px';
+  sug.style.top = rect.bottom + 'px';
+  sug.style.width = rect.width + 'px';
+
   if (results.length === 0 && q.length > 0) {
     sug.innerHTML = '<div class="sug-item" style="color:#666;font-style:italic">Kein Ordner gefunden – nutze "+ Ordner" um ihn anzulegen</div>';
     sug.style.display = 'block';
@@ -812,6 +827,13 @@ function selectFolder(name, id) {
   document.getElementById('folder-suggestions').style.display = 'none';
   state.folder = name;
   state.folderId = id;
+}
+
+// Gefundene Folder-IDs in localStorage speichern
+function saveFolderIdCache() {
+  try {
+    localStorage.setItem('ki_folder_ids', JSON.stringify(outlookFolderMap));
+  } catch(e) {}
 }
 
 // Manuell hinzugefuegten Ordner speichern (nur via "+ Ordner" Button)
@@ -1595,57 +1617,78 @@ async function moveMailToFolder() {
   }
 }
 
-// Ordner per Name suchen
+// Ordner per Name suchen – nutzt Rueckwaerts-Entdeckung
 async function findFolderByName(name) {
-  // 1. Erst in lokaler Map suchen (exakt + teilweise)
-  var folders = getKnownFolders();
-  var nameLower = name.toLowerCase();
-  var found = Object.keys(folders).find(function(k) {
-    return k.toLowerCase() === nameLower;
-  });
-  if (found) return folders[found];
-  // Teilmatch: "IT" findet "IT / Anleitungen" nicht, aber "Hafenklinik" findet "Firmen & Organisationen / Hafenklinik"
-  found = Object.keys(folders).find(function(k) {
-    var parts = k.split(' / ');
-    return parts.some(function(p) { return p.toLowerCase() === nameLower; });
-  });
-  if (found) return folders[found];
+  // Den letzten Teil des Pfads als Ordnername extrahieren
+  // "01_ToDo / 01_Wichtig & Dringend" → suche nach "01_Wichtig & Dringend"
+  var parts = name.split(' / ');
+  var leafName = parts[parts.length - 1];
+  var leafLower = leafName.toLowerCase();
 
-  // 2. Per API: Mails suchen die in einem Ordner mit diesem Namen liegen
-  // (Workaround fuer den childFolders-Bug)
+  // 1. In bekannten Ordnern suchen (mit ID)
+  var folders = getKnownFolders();
+  // Exakter Pfad-Match
+  var exactId = folders[name];
+  if (exactId) return exactId;
+  // Exakter Blatt-Name Match in outlookFolderMap
+  var mapId = outlookFolderMap[leafName] || outlookFolderMap[name];
+  if (mapId) return mapId;
+
+  // 2. Rueckwaerts-Entdeckung: Mails lesen, Ordner-IDs sammeln, Namen abfragen
+  showToast('Suche Ordner "' + leafName + '"...', 'info');
   try {
-    // Suche eine Mail die kuerzlich in einen passenden Ordner verschoben wurde
-    var searchRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages?$top=50&$select=parentFolderId&$search="' + encodeURIComponent(name) + '"');
-    if (searchRes && searchRes.ok) {
-      var searchData = await searchRes.json();
-      var checkedIds = {};
-      for (var i = 0; i < (searchData.value || []).length; i++) {
-        var fid = searchData.value[i].parentFolderId;
-        if (checkedIds[fid]) continue;
-        checkedIds[fid] = true;
-        // Ordner-Details holen
-        var fRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + fid + '?$select=id,displayName');
+    var folderIds = new Set();
+    var url = 'https://graph.microsoft.com/v1.0/me/messages?$top=500&$select=parentFolderId';
+    var pages = 0;
+    while (url && pages < 3) {
+      var res = await graphFetch(url);
+      if (!res || !res.ok) break;
+      var data = await res.json();
+      (data.value || []).forEach(function(m) {
+        if (m.parentFolderId) folderIds.add(m.parentFolderId);
+      });
+      url = data['@odata.nextLink'] || null;
+      pages++;
+    }
+
+    // Fuer jede gefundene Ordner-ID den Namen abfragen
+    var ids = Array.from(folderIds);
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        var fRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + ids[i] + '?$select=id,displayName,parentFolderId');
         if (fRes && fRes.ok) {
           var fData = await fRes.json();
-          if (fData.displayName.toLowerCase() === nameLower) {
-            outlookFolderMap[fData.displayName] = fData.id;
+          // Ordner speichern
+          outlookFolderMap[fData.displayName] = fData.id;
+          // Match?
+          if (fData.displayName.toLowerCase() === leafLower) {
+            // ID gefunden! Auch den vollen Pfad speichern
+            outlookFolderMap[name] = fData.id;
+            saveFolderIdCache();
+            showToast('Ordner "' + leafName + '" gefunden', 'success');
             return fData.id;
           }
+          // Parent auch entdecken
+          if (fData.parentFolderId && !folderIds.has(fData.parentFolderId)) {
+            folderIds.add(fData.parentFolderId);
+            ids.push(fData.parentFolderId);
+          }
         }
-      }
+      } catch(e) {}
     }
   } catch(e) { console.error('Ordner-Suche Fehler:', e); }
 
-  // 3. Letzte Chance: alle bekannten Folder-IDs durchgehen und einzeln abfragen
-  // (teuer, aber findet garantiert alles)
+  // 3. Top-Level Ordner durchgehen
   try {
     var topRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=200&$select=id,displayName');
     if (topRes && topRes.ok) {
       var topData = await topRes.json();
       for (var j = 0; j < (topData.value || []).length; j++) {
         var tf = topData.value[j];
-        if (tf.displayName.toLowerCase() === nameLower) {
+        if (tf.displayName.toLowerCase() === leafLower) {
           outlookFolderMap[tf.displayName] = tf.id;
+          outlookFolderMap[name] = tf.id;
+          saveFolderIdCache();
           return tf.id;
         }
       }
