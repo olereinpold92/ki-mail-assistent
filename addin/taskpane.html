@@ -1737,17 +1737,22 @@ function onOdSearch() {
 
       resultsDiv.innerHTML = '';
       folders.forEach(function(f) {
-        var rawPath = f.parentReference && f.parentReference.path
-          ? f.parentReference.path.replace('/drive/root:', '').replace(/^\//, '')
-          : '';
-        var fullPath = rawPath ? rawPath.replace(/\//g, ' / ') + ' / ' + f.name : f.name;
+        var rawPath = '';
+        if (f.parentReference && f.parentReference.path) {
+          // Pfad kommt als "/drive/root:/Firma/Ordner1/Ordner2"
+          var p = f.parentReference.path;
+          var colonIdx = p.indexOf(':');
+          if (colonIdx >= 0) p = p.substring(colonIdx + 1);
+          rawPath = decodeURIComponent(p).replace(/^\//, '');
+        }
+        var fullPath = rawPath ? rawPath.replace(/\//g, ' › ') + ' › ' + f.name : f.name;
 
         var div = document.createElement('div');
-        div.style.cssText = 'padding:8px 10px;cursor:pointer;border-bottom:1px solid #eee;';
+        div.style.cssText = 'padding:8px 10px;cursor:pointer;border-bottom:1px solid #eee;background:white;';
         div.onmouseover = function() { div.style.background = '#e8f0fe'; };
         div.onmouseout = function() { div.style.background = 'white'; };
         div.innerHTML = '<div style="font-size:12px;font-weight:600;">&#128193; ' + f.name + '</div>'
-          + '<div style="font-size:11px;color:#666;margin-top:2px;word-break:break-all;">' + fullPath + '</div>';
+          + '<div style="font-size:10px;color:#0078d4;margin-top:2px;word-break:break-all;">' + fullPath + '</div>';
         div.onclick = function() {
           odSelectedFolderId = f.id;
           odCurrentPath = [];
