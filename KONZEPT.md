@@ -276,6 +276,29 @@ Kein Vektorspeicher noetig: Bei 1.000 Eintraegen ist der Index ~100KB – Tag-Ma
 - Keine Cloud-Abhaengigkeit fuer das Gedaechtnis
 - Server.py hat POST-Endpunkt zum Schreiben (nur erlaubte Pfade in Whitelist)
 
+### Systemuebergreifende Architektur (entschieden 26.03.2026)
+
+Das Gedaechtnis und die Konzeptdokumente sind NICHT an das Outlook Add-in gebunden.
+Sie sind systemuebergreifend und fuer alle zukuenftigen Tools zugaenglich.
+
+**Gemeinsam genutzt (von allen Tools):**
+- `/gedaechtnis/entries.json` – Gelerntes Wissen
+- `/gedaechtnis/profil/` – Oles Profil
+- `CLAUDE.md` – Arbeitsregeln fuer die KI
+- `KONZEPT.md` – Uebergreifendes Projektkonzept
+
+**Getrennt (pro Tool eigenes Verzeichnis):**
+- `/addin/` – Outlook Mail-Assistent
+- `/controlling/` – Controlling-Tool (geplant, noch nicht gebaut)
+- Weitere Tools spaeter
+
+Jedes Tool ist eine eigene Anwendung mit eigenem Interface.
+Die Verbindung laeuft ueber die gemeinsamen Dateien auf der Festplatte.
+Wenn ein Tool etwas lernt, profitieren alle anderen davon.
+
+**Naechstes Projekt:** Controlling-Tools (bisher in Excel) in ein moderneres Format bringen.
+Status: Konzeptphase, Excel-Dateien muessen noch analysiert werden.
+
 ---
 
 ## 6. OLES KOMMUNIKATIONSSTIL
