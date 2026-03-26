@@ -1735,40 +1735,51 @@ function onOdSearch() {
         return;
       }
 
+      // Fuer jeden Treffer den vollen Pfad aufbauen via parentReference.id
       resultsDiv.innerHTML = '';
-      folders.forEach(function(f) {
-        var rawPath = '';
-        if (f.parentReference && f.parentReference.path) {
-          // Pfad kommt als "/drive/root:/Firma/Ordner1/Ordner2"
-          var p = f.parentReference.path;
-          var colonIdx = p.indexOf(':');
-          if (colonIdx >= 0) p = p.substring(colonIdx + 1);
-          rawPath = decodeURIComponent(p).replace(/^\//, '');
+      for (var fi = 0; fi < folders.length; fi++) {
+        var f = folders[fi];
+        // Pfad rueckwaerts aufbauen: Parent abfragen bis Root
+        var pathParts = [f.name];
+        var parentId = f.parentReference ? f.parentReference.id : null;
+        var visited = {};
+        while (parentId && !visited[parentId]) {
+          visited[parentId] = true;
+          try {
+            var pRes = await graphFetch('https://graph.microsoft.com/v1.0/me/drive/items/' + parentId + '?$select=id,name,parentReference,root');
+            if (pRes && pRes.ok) {
+              var pData = await pRes.json();
+              if (pData.root) break; // Root erreicht
+              pathParts.unshift(pData.name);
+              parentId = pData.parentReference ? pData.parentReference.id : null;
+            } else { break; }
+          } catch(e) { break; }
         }
-        var fullPath = rawPath ? rawPath.replace(/\//g, ' › ') + ' › ' + f.name : f.name;
+        var fullPath = pathParts.join(' › ');
 
         var div = document.createElement('div');
         div.style.cssText = 'padding:8px 10px;cursor:pointer;border-bottom:1px solid #eee;background:white;';
-        div.onmouseover = function() { div.style.background = '#e8f0fe'; };
-        div.onmouseout = function() { div.style.background = 'white'; };
+        div.onmouseover = function() { this.style.background = '#e8f0fe'; };
+        div.onmouseout = function() { this.style.background = 'white'; };
         div.innerHTML = '<div style="font-size:12px;font-weight:600;">&#128193; ' + f.name + '</div>'
-          + '<div style="font-size:10px;color:#0078d4;margin-top:2px;word-break:break-all;">' + fullPath + '</div>'
-          + '<div style="font-size:9px;color:#999;margin-top:1px;word-break:break-all;">DEBUG: ' + (f.parentReference ? f.parentReference.path || 'kein path' : 'kein parentRef') + '</div>';
-        div.onclick = function() {
-          odSelectedFolderId = f.id;
-          odCurrentPath = [];
-          if (rawPath) {
-            rawPath.split('/').filter(Boolean).forEach(function(p) { odCurrentPath.push({ id: '', name: p.trim() }); });
-          }
-          odCurrentPath.push({ id: f.id, name: f.name });
-          document.getElementById('od-search').value = '';
-          resultsDiv.style.display = 'none';
-          browserDiv.style.display = 'block';
-          bcDiv.style.display = 'block';
-          confirmOdFolder();
-        };
+          + '<div style="font-size:10px;color:#0078d4;margin-top:2px;word-break:break-all;">' + fullPath + '</div>';
+
+        // Closure fuer onclick
+        (function(folder, parts) {
+          div.onclick = function() {
+            odSelectedFolderId = folder.id;
+            odCurrentPath = parts.map(function(p) { return { id: '', name: p }; });
+            odCurrentPath[odCurrentPath.length - 1].id = folder.id;
+            document.getElementById('od-search').value = '';
+            resultsDiv.style.display = 'none';
+            browserDiv.style.display = 'block';
+            bcDiv.style.display = 'block';
+            confirmOdFolder();
+          };
+        })(f, pathParts);
+
         resultsDiv.appendChild(div);
-      });
+      }
     } catch(e) {
       resultsDiv.innerHTML = '<div style="padding:8px;color:#d32f2f;">Fehler: ' + e.message + '</div>';
     }
