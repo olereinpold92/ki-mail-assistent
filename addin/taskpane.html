@@ -735,13 +735,17 @@ function getKnownFolders() {
 
 function getFilteredFolderList(query) {
   var folders = getKnownFolders();
+  var systemFolders = ['Synchronisierungsprobleme', 'RSS-Feeds', 'Postausgang', 'Junk-E-Mail',
+    'Entwürfe', 'Gelöschte Elemente', 'Gesendete Elemente', 'Social Activity',
+    'Top of Information Store', 'Posteingang', 'Archiv', 'Verlauf der Unterhaltung',
+    'Notizen', 'Gesendet', 'Journal', 'Papierkorb', 'Spam', 'Suchordner'];
 
   var results = [];
   var q = (query || '').toLowerCase();
   Object.keys(folders).forEach(function(name) {
     // System-Ordner ausblenden
     var hide = false;
-    hideFolders.forEach(function(h) { if (name.indexOf(h) !== -1) hide = true; });
+    systemFolders.forEach(function(h) { if (name.indexOf(h) !== -1) hide = true; });
     if (hide) return;
     // Filter
     if (!q || name.toLowerCase().indexOf(q) !== -1) {
