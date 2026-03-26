@@ -198,6 +198,7 @@
       <select id="folder-select"><option value="">Wird geladen...</option></select>
       <div class="btn-row">
         <button class="btn btn-primary btn-sm" onclick="moveMailToFolder()">Mail verschieben</button>
+        <button class="btn btn-outline btn-sm" onclick="refreshFolders()">Ordner neu laden</button>
       </div>
     </div>
   </div>
@@ -341,9 +342,9 @@ async function autoConnect() {
       var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
       state.graphToken = silentResult.accessToken;
       updateConnectionUI(true);
-      // Ordner nur aktualisieren wenn aelter als 1 Stunde (sonst Cache reicht)
+      // Ordner aktualisieren wenn aelter als 30 Min oder noch nie geladen
       var lastLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
-      if (Date.now() - lastLoad > 3600000) {
+      if (Date.now() - lastLoad > 1800000) {
         // Im Hintergrund, nicht blockierend
         loadOutlookFolders();
         loadOneDriveFolders();
@@ -452,7 +453,14 @@ function updateConnectionUI(connected) {
   }
 }
 
-// onGraphConnected nicht mehr noetig – wird direkt in connectMicrosoft/autoConnect gehandelt
+// Ordner manuell neu laden (Cache loeschen + frisch von API)
+async function refreshFolders() {
+  localStorage.removeItem('ki_outlook_folders');
+  localStorage.removeItem('ki_folders_loaded_at');
+  showToast('Ordner werden neu geladen...', 'info');
+  await loadOutlookFolders();
+  showToast('Ordner aktualisiert', 'success');
+}
 
 /* ========== ORDNER-CACHE (localStorage) ========== */
 function saveFolderCaches(outlookFolders, oneDriveFolders) {
@@ -531,38 +539,29 @@ async function loadOutlookFolders() {
 function populateFolderDropdownReal(folders) {
   var sel = document.getElementById('folder-select');
   sel.innerHTML = '<option value="">-- Ordner waehlen --</option>';
-  // Gruppiert nach Top-Level Parent
-  var grouped = {};
-  var topLevel = [];
+
+  // Einfache, flache Liste – jeder Ordner als eigene Option
+  // Einrueckung per Pfad zeigt die Hierarchie
+  // System-Ordner die man nie braucht ausblenden
+  var hideFolders = ['Synchronisierungsprobleme', 'RSS-Feeds', 'Postausgang', 'Junk-E-Mail',
+    'Entwuerfe', 'Entwürfe', 'Gelöschte Elemente', 'Geloeschte Elemente', 'Gesendete Elemente'];
+
   folders.forEach(function(f) {
-    if (!f.parentName) {
-      topLevel.push(f);
-      if (!grouped[f.name]) grouped[f.name] = [];
-    } else {
-      var topParent = f.parentName.split(' / ')[0];
-      if (!grouped[topParent]) grouped[topParent] = [];
-      grouped[topParent].push(f);
-    }
+    var name = f.fullPath || f.name;
+    // System-Ordner ausblenden
+    var hide = false;
+    hideFolders.forEach(function(h) {
+      if (name.indexOf(h) !== -1) hide = true;
+    });
+    if (hide) return;
+
+    var opt = document.createElement('option');
+    opt.value = f.id;
+    opt.textContent = name;
+    sel.appendChild(opt);
   });
-  topLevel.forEach(function(top) {
-    var children = grouped[top.name] || [];
-    if (children.length > 0) {
-      var og = document.createElement('optgroup');
-      og.label = top.name;
-      children.forEach(function(c) {
-        var cOpt = document.createElement('option');
-        cOpt.value = c.id;
-        cOpt.textContent = c.fullPath || (c.parentName + ' / ' + c.name);
-        og.appendChild(cOpt);
-      });
-      sel.appendChild(og);
-    } else {
-      var opt = document.createElement('option');
-      opt.value = top.id;
-      opt.textContent = top.name;
-      sel.appendChild(opt);
-    }
-  });
+
+  console.log('Dropdown befuellt mit ' + (sel.options.length - 1) + ' Ordnern');
 }
 
 /* ========== ONEDRIVE ORDNER LADEN ========== */
@@ -1159,11 +1158,12 @@ function setAktion(btn) {
 
 function updateBlockSenderUI() {
   var area = document.getElementById('block-sender-area');
-  if (state.fromEmail) {
+  if (state.aktion === 'loeschen' && state.fromEmail) {
     var domain = state.fromEmail.split('@')[1] || '';
     document.getElementById('block-domain').textContent = domain;
-    // Immer anzeigen (nicht nur bei loeschen), aber bei loeschen vorausgewaehlt
     area.style.display = 'block';
+  } else {
+    area.style.display = 'none';
   }
 }
 
