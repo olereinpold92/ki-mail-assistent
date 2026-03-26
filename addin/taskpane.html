@@ -226,6 +226,8 @@
         <span style="color:#666;">Ordner:</span> <strong id="onedrive-selected-path"></strong> <span style="color:#999;font-size:10px;">&#9998; aendern</span>
       </div>
       <div id="onedrive-browser-wrap">
+        <input type="text" id="od-search" class="folder-input" placeholder="Ordner suchen..." oninput="onOdSearch()" style="margin-bottom:4px;font-size:11px;padding:4px 6px;">
+        <div id="od-search-results" style="display:none;border:1px solid #ddd;border-radius:4px;max-height:168px;overflow-y:auto;background:#fafafa;margin-bottom:4px;"></div>
         <div id="onedrive-breadcrumb" style="font-size:11px;margin:4px 0;color:#0078d4;cursor:pointer;"></div>
         <div id="onedrive-browser" style="border:1px solid #ddd;border-radius:4px;max-height:168px;overflow-y:auto;background:#fafafa;"></div>
         <div class="btn-row">
@@ -1684,6 +1686,72 @@ function renderBreadcrumb() {
     html += ' &rsaquo; <span onclick="browseOneDrive(\'' + p.id + '\',\'' + p.name.replace(/'/g, "\\'") + '\')" style="cursor:pointer">' + p.name + '</span>';
   });
   bc.innerHTML = html;
+}
+
+// OneDrive-Ordner durchsuchen
+var odSearchTimeout = null;
+function onOdSearch() {
+  clearTimeout(odSearchTimeout);
+  var q = document.getElementById('od-search').value.trim();
+  var resultsDiv = document.getElementById('od-search-results');
+  var browserDiv = document.getElementById('onedrive-browser');
+  var bcDiv = document.getElementById('onedrive-breadcrumb');
+
+  if (!q) {
+    resultsDiv.style.display = 'none';
+    browserDiv.style.display = 'block';
+    bcDiv.style.display = 'block';
+    return;
+  }
+
+  // Kurz warten damit nicht bei jedem Tastendruck gesucht wird
+  odSearchTimeout = setTimeout(async function() {
+    if (!state.graphToken) return;
+    resultsDiv.innerHTML = '<div style="padding:6px;color:#666;font-size:11px;">Suche...</div>';
+    resultsDiv.style.display = 'block';
+    browserDiv.style.display = 'none';
+    bcDiv.style.display = 'none';
+
+    try {
+      // Graph API: OneDrive Suche nach Ordnern
+      var res = await graphFetch("https://graph.microsoft.com/v1.0/me/drive/root/search(q='" + encodeURIComponent(q) + "')?$select=id,name,folder,parentReference&$top=20");
+      if (!res || !res.ok) { resultsDiv.innerHTML = '<div style="padding:6px;color:#d32f2f;">Suche fehlgeschlagen</div>'; return; }
+      var data = await res.json();
+      var folders = (data.value || []).filter(function(i) { return i.folder; });
+
+      if (folders.length === 0) {
+        resultsDiv.innerHTML = '<div style="padding:6px;color:#666;font-size:11px;">Kein Ordner gefunden</div>';
+        return;
+      }
+
+      resultsDiv.innerHTML = '';
+      folders.forEach(function(f) {
+        var path = f.parentReference && f.parentReference.path
+          ? f.parentReference.path.replace('/drive/root:', '').replace(/\//g, ' / ')
+          : '';
+        var div = document.createElement('div');
+        div.className = 'od-item';
+        div.innerHTML = '<span class="od-icon">&#128193;</span><div><div>' + f.name + '</div><div style="font-size:10px;color:#999;">' + (path ? path + ' / ' + f.name : f.name) + '</div></div>';
+        div.onclick = function() {
+          // Ordner auswaehlen
+          odSelectedFolderId = f.id;
+          odCurrentPath = [];
+          if (path) {
+            path.split(' / ').filter(Boolean).forEach(function(p) { odCurrentPath.push({ id: '', name: p.trim() }); });
+          }
+          odCurrentPath.push({ id: f.id, name: f.name });
+          document.getElementById('od-search').value = '';
+          resultsDiv.style.display = 'none';
+          browserDiv.style.display = 'block';
+          bcDiv.style.display = 'block';
+          confirmOdFolder();
+        };
+        resultsDiv.appendChild(div);
+      });
+    } catch(e) {
+      resultsDiv.innerHTML = '<div style="padding:6px;color:#d32f2f;">Fehler: ' + e.message + '</div>';
+    }
+  }, 300);
 }
 
 // Ordner waehlen: Browser einklappen, Auswahl anzeigen
