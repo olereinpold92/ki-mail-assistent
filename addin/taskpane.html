@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KI Mail Assistent</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', -apple-system, sans-serif; background: #f3f3f3; color: #333; font-size: 13px; overflow-y: auto; }
@@ -82,6 +83,12 @@
     .execute-all { margin: 8px; }
     .execute-all .btn { width: 100%; padding: 12px; font-size: 14px; }
 
+    /* Connection status */
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .conn-dot.connected { background: #4caf50; }
+    .conn-dot.disconnected { background: #999; }
+    .header-btns { display: flex; gap: 4px; align-items: center; }
+
     /* Analyze bar (always visible at top) */
     .analyze-bar { margin: 8px; display: flex; gap: 6px; align-items: center; }
     .analyze-bar .btn { flex: 1; padding: 10px; font-size: 13px; }
@@ -118,7 +125,10 @@
 <!-- Header -->
 <div class="header">
   <span>KI Mail Assistent</span>
-  <button class="header-btn" onclick="toggleConfig()">Einstellungen</button>
+  <div class="header-btns">
+    <button class="header-btn" id="btn-connect" onclick="connectMicrosoft()"><span class="conn-dot disconnected" id="conn-dot"></span>Verbinden</button>
+    <button class="header-btn" onclick="toggleConfig()">Einstellungen</button>
+  </div>
 </div>
 
 <!-- Loading state -->
@@ -268,6 +278,7 @@
 /* ========== STATE ========== */
 var state = {
   mailId: null,
+  restMailId: null,
   subject: '',
   from: '',
   fromEmail: '',
@@ -281,6 +292,261 @@ var state = {
   tasks: [],
   graphToken: null
 };
+
+/* ========== GRAPH API MAPS ========== */
+var outlookFolderMap = {};   // displayName -> folder ID
+var oneDriveFolderMap = {};  // path -> driveItem ID
+var msalInstance = null;
+var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite'];
+
+/* ========== MSAL AUTH ========== */
+function initMsal() {
+  if (msalInstance) return msalInstance;
+  var clientId = localStorage.getItem('ki_client_id') || 'aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0';
+  var tenantId = localStorage.getItem('ki_tenant_id') || '710620de-9a6b-4cca-bf53-99ce2a3e407f';
+  var msalConfig = {
+    auth: {
+      clientId: clientId,
+      authority: 'https://login.microsoftonline.com/' + tenantId,
+      redirectUri: window.location.origin + '/addin/taskpane.html'
+    },
+    cache: {
+      cacheLocation: 'sessionStorage',
+      storeAuthStateInCookie: false
+    }
+  };
+  msalInstance = new msal.PublicClientApplication(msalConfig);
+  return msalInstance;
+}
+
+async function connectMicrosoft() {
+  try {
+    var instance = initMsal();
+    // Erst versuchen ob schon ein Account eingeloggt ist
+    var accounts = instance.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
+        state.graphToken = silentResult.accessToken;
+        updateConnectionUI(true);
+        onGraphConnected();
+        return;
+      } catch(e) { /* Silent fehlgeschlagen, Popup noetig */ }
+    }
+    // Popup Login
+    var result = await instance.loginPopup({ scopes: graphScopes });
+    if (result && result.accessToken) {
+      state.graphToken = result.accessToken;
+    } else if (result && result.account) {
+      var tokenResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: result.account });
+      state.graphToken = tokenResult.accessToken;
+    }
+    updateConnectionUI(true);
+    onGraphConnected();
+  } catch(e) {
+    console.error('MSAL Fehler:', e);
+    if (e.message && e.message.includes('popup')) {
+      showToast('Popup blockiert – bitte Popup-Blocker fuer localhost deaktivieren', 'error');
+    } else {
+      showToast('Microsoft-Anmeldung fehlgeschlagen: ' + e.message, 'error');
+    }
+  }
+}
+
+async function getGraphToken() {
+  if (!msalInstance) initMsal();
+  var accounts = msalInstance.getAllAccounts();
+  if (accounts.length === 0) {
+    showToast('Bitte erst mit Microsoft verbinden', 'info');
+    return null;
+  }
+  try {
+    var result = await msalInstance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
+    state.graphToken = result.accessToken;
+    return result.accessToken;
+  } catch(e) {
+    try {
+      var result = await msalInstance.acquireTokenPopup({ scopes: graphScopes });
+      state.graphToken = result.accessToken;
+      return result.accessToken;
+    } catch(e2) {
+      showToast('Token-Erneuerung fehlgeschlagen', 'error');
+      updateConnectionUI(false);
+      return null;
+    }
+  }
+}
+
+async function graphFetch(url, options) {
+  var token = await getGraphToken();
+  if (!token) return null;
+  options = options || {};
+  options.headers = options.headers || {};
+  options.headers['Authorization'] = 'Bearer ' + token;
+  if (options.body && typeof options.body === 'string') {
+    options.headers['Content-Type'] = 'application/json';
+  }
+  var res = await fetch(url, options);
+  // Bei 401: Token erneuern und nochmal versuchen
+  if (res.status === 401) {
+    state.graphToken = null;
+    token = await getGraphToken();
+    if (!token) return null;
+    options.headers['Authorization'] = 'Bearer ' + token;
+    res = await fetch(url, options);
+  }
+  return res;
+}
+
+function updateConnectionUI(connected) {
+  var dot = document.getElementById('conn-dot');
+  var btn = document.getElementById('btn-connect');
+  if (connected) {
+    dot.className = 'conn-dot connected';
+    btn.innerHTML = '<span class="conn-dot connected" id="conn-dot"></span>Verbunden';
+  } else {
+    dot.className = 'conn-dot disconnected';
+    btn.innerHTML = '<span class="conn-dot disconnected" id="conn-dot"></span>Verbinden';
+    state.graphToken = null;
+  }
+}
+
+async function onGraphConnected() {
+  showToast('Mit Microsoft verbunden', 'success');
+  // Ordner laden (parallel)
+  await Promise.all([loadOutlookFolders(), loadOneDriveFolders()]);
+}
+
+/* ========== OUTLOOK ORDNER LADEN ========== */
+async function loadOutlookFolders() {
+  if (!state.graphToken) { populateFolderDropdown(); return; }
+  try {
+    showToast('Outlook-Ordner werden geladen...', 'info');
+    // Top-Level Ordner
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=50&$select=id,displayName,childFolderCount');
+    if (!res || !res.ok) { populateFolderDropdown(); return; }
+    var data = await res.json();
+    var topFolders = data.value || [];
+
+    outlookFolderMap = {};
+    var allFolders = []; // {name, id, parentName}
+
+    for (var i = 0; i < topFolders.length; i++) {
+      var f = topFolders[i];
+      outlookFolderMap[f.displayName] = f.id;
+      allFolders.push({ name: f.displayName, id: f.id, parentName: null });
+
+      // Unterordner laden
+      if (f.childFolderCount > 0) {
+        var childRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + f.id + '/childFolders?$top=50&$select=id,displayName,childFolderCount');
+        if (childRes && childRes.ok) {
+          var childData = await childRes.json();
+          var children = childData.value || [];
+          for (var j = 0; j < children.length; j++) {
+            var c = children[j];
+            var fullName = f.displayName + ' / ' + c.displayName;
+            outlookFolderMap[fullName] = c.id;
+            outlookFolderMap[c.displayName] = c.id;
+            allFolders.push({ name: c.displayName, id: c.id, parentName: f.displayName });
+
+            // Noch eine Ebene tiefer
+            if (c.childFolderCount > 0) {
+              var subRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + c.id + '/childFolders?$top=50&$select=id,displayName');
+              if (subRes && subRes.ok) {
+                var subData = await subRes.json();
+                (subData.value || []).forEach(function(s) {
+                  var subName = f.displayName + ' / ' + c.displayName + ' / ' + s.displayName;
+                  outlookFolderMap[subName] = s.id;
+                  outlookFolderMap[s.displayName] = s.id;
+                  allFolders.push({ name: s.displayName, id: s.id, parentName: f.displayName + ' / ' + c.displayName });
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    // Dropdown befuellen
+    populateFolderDropdownReal(allFolders);
+    showToast(allFolders.length + ' Outlook-Ordner geladen', 'success');
+  } catch(e) {
+    console.error('Ordner laden Fehler:', e);
+    populateFolderDropdown();
+  }
+}
+
+function populateFolderDropdownReal(folders) {
+  var sel = document.getElementById('folder-select');
+  sel.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+  // Gruppiert nach Parent
+  var grouped = {};
+  var topLevel = [];
+  folders.forEach(function(f) {
+    if (!f.parentName) {
+      topLevel.push(f);
+      if (!grouped[f.name]) grouped[f.name] = [];
+    } else {
+      var parent = f.parentName.split(' / ')[0];
+      if (!grouped[parent]) grouped[parent] = [];
+      grouped[parent].push(f);
+    }
+  });
+  topLevel.forEach(function(top) {
+    var children = grouped[top.name] || [];
+    if (children.length > 0) {
+      var og = document.createElement('optgroup');
+      og.label = top.name;
+      // Parent selbst als Option
+      var pOpt = document.createElement('option');
+      pOpt.value = top.id;
+      pOpt.textContent = top.name;
+      og.appendChild(pOpt);
+      children.forEach(function(c) {
+        var cOpt = document.createElement('option');
+        cOpt.value = c.id;
+        cOpt.textContent = (c.parentName ? c.parentName + ' / ' : '') + c.name;
+        og.appendChild(cOpt);
+      });
+      sel.appendChild(og);
+    } else {
+      var opt = document.createElement('option');
+      opt.value = top.id;
+      opt.textContent = top.name;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+/* ========== ONEDRIVE ORDNER LADEN ========== */
+async function loadOneDriveFolders() {
+  if (!state.graphToken) return;
+  try {
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,folder&$top=50');
+    if (!res || !res.ok) return;
+    var data = await res.json();
+    var items = (data.value || []).filter(function(i) { return i.folder; });
+
+    oneDriveFolderMap = {};
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      oneDriveFolderMap[item.name] = item.id;
+      // Unterordner laden
+      var subRes = await graphFetch('https://graph.microsoft.com/v1.0/me/drive/items/' + item.id + '/children?$select=id,name,folder&$top=50');
+      if (subRes && subRes.ok) {
+        var subData = await subRes.json();
+        (subData.value || []).filter(function(x) { return x.folder; }).forEach(function(sub) {
+          var path = item.name + ' / ' + sub.name;
+          oneDriveFolderMap[path] = sub.id;
+        });
+      }
+    }
+    // Anhang-Dropdowns aktualisieren falls bereits sichtbar
+    if (state.attachments.length > 0) renderAttachments();
+    showToast('OneDrive-Ordner geladen', 'success');
+  } catch(e) {
+    console.warn('OneDrive Ordner Fehler:', e);
+  }
+}
 
 /* ========== GEDAECHTNIS (loaded from server) ========== */
 var gedaechtnis = {
@@ -405,6 +671,13 @@ function readMailData() {
   state.from = item.from ? item.from.displayName : 'Unbekannt';
   state.fromEmail = item.from ? item.from.emailAddress : '';
   state.mailId = item.itemId;
+  // EWS-ID in REST-ID konvertieren (Graph API braucht REST-Format)
+  try {
+    state.restMailId = Office.context.mailbox.convertToRestId(item.itemId, Office.MailboxEnums.RestVersion.v2_0);
+  } catch(e) {
+    state.restMailId = item.itemId; // Fallback
+    console.warn('convertToRestId fehlgeschlagen:', e);
+  }
 
   // Anhaenge lesen
   if (item.attachments && item.attachments.length > 0) {
@@ -511,7 +784,10 @@ function renderAttachments() {
   var list = document.getElementById('att-list');
   list.innerHTML = '';
   var onedriveFolders = [];
-  if (gedaechtnis.anhangRegeln && gedaechtnis.anhangRegeln.ordner) {
+  // Echte OneDrive-Ordner bevorzugen, sonst Fallback auf statische Liste
+  if (Object.keys(oneDriveFolderMap).length > 0) {
+    onedriveFolders = Object.keys(oneDriveFolderMap);
+  } else if (gedaechtnis.anhangRegeln && gedaechtnis.anhangRegeln.ordner) {
     var o = gedaechtnis.anhangRegeln.ordner;
     Object.keys(o).forEach(function(cat) {
       o[cat].forEach(function(sub) { onedriveFolders.push(cat + ' / ' + sub); });
@@ -816,7 +1092,7 @@ function saveFeedbackToStorage(correct, text) {
   localStorage.setItem('ki_feedback_log', JSON.stringify(feedbackLog));
 }
 
-/* ========== PLACEHOLDER ACTIONS (Graph API kommt als naechstes) ========== */
+/* ========== ANTWORT GENERIEREN (Claude API) ========== */
 async function generateReply() {
   var claudeKey = localStorage.getItem('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
@@ -853,25 +1129,172 @@ async function generateReply() {
   }
 }
 
-function moveMailToFolder() {
-  showToast('Mail verschieben: Graph API Auth wird noch eingebaut', 'info');
+/* ========== MAIL VERSCHIEBEN (Graph API) ========== */
+async function moveMailToFolder() {
+  var sel = document.getElementById('folder-select');
+  var folderId = sel.value;
+  var folderName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
+  if (!folderId) { showToast('Bitte erst einen Ordner waehlen', 'info'); return; }
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
+
+  try {
+    showToast('Mail wird verschoben...', 'info');
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
+      method: 'POST',
+      body: JSON.stringify({ destinationId: folderId })
+    });
+    if (res && res.ok) {
+      showToast('Mail verschoben → ' + folderName, 'success');
+    } else {
+      var err = res ? await res.json() : {};
+      showToast('Fehler: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
+    }
+  } catch(e) {
+    showToast('Verschieben fehlgeschlagen: ' + e.message, 'error');
+  }
 }
 
-function uploadAllAttachments() {
-  showToast('OneDrive-Upload: Graph API Auth wird noch eingebaut', 'info');
+/* ========== ANHAENGE IN ONEDRIVE ABLEGEN (Graph API) ========== */
+async function uploadAllAttachments() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
+  if (state.attachments.length === 0) { showToast('Keine Anhaenge vorhanden', 'info'); return; }
+
+  // Alle Anhaenge von Graph laden
+  showToast('Anhaenge werden geladen...', 'info');
+  var attRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/attachments');
+  if (!attRes || !attRes.ok) { showToast('Anhaenge konnten nicht geladen werden', 'error'); return; }
+  var attData = await attRes.json();
+  var graphAttachments = attData.value || [];
+
+  var erfolg = 0, fehler = 0;
+  for (var idx = 0; idx < state.attachments.length; idx++) {
+    var att = state.attachments[idx];
+    var filename = document.getElementById('att-name-' + idx) ? document.getElementById('att-name-' + idx).value.trim() : att.name;
+    var folderSel = document.getElementById('att-folder-' + idx);
+    var folderPath = folderSel ? folderSel.value : '';
+    var folderId = oneDriveFolderMap[folderPath];
+
+    if (!filename) { fehler++; continue; }
+
+    // Passenden Graph-Anhang finden (nach Name)
+    var graphAtt = graphAttachments.find(function(ga) { return ga.name === att.name; }) || graphAttachments[idx];
+    if (!graphAtt || !graphAtt.contentBytes) {
+      showToast('Anhang "' + att.name + '" nicht gefunden', 'error');
+      fehler++;
+      continue;
+    }
+
+    // Base64 -> Blob
+    var binary = atob(graphAtt.contentBytes);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    var blob = new Blob([bytes], { type: graphAtt.contentType || 'application/octet-stream' });
+
+    // Upload URL
+    var uploadUrl;
+    if (folderId) {
+      uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/items/' + folderId + ':/' + encodeURIComponent(filename) + ':/content';
+    } else {
+      uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(filename) + ':/content';
+    }
+
+    try {
+      showToast('Lade "' + filename + '" hoch...', 'info');
+      var upRes = await graphFetch(uploadUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': graphAtt.contentType || 'application/octet-stream' }
+      });
+      if (upRes && upRes.ok) {
+        erfolg++;
+      } else {
+        var err = upRes ? await upRes.json() : {};
+        console.error('Upload Fehler:', err);
+        fehler++;
+      }
+    } catch(e) {
+      console.error('Upload Fehler:', e);
+      fehler++;
+    }
+  }
+  if (fehler === 0) {
+    showToast(erfolg + ' Anhang/Anhaenge in OneDrive abgelegt', 'success');
+  } else {
+    showToast(erfolg + ' hochgeladen, ' + fehler + ' fehlgeschlagen', 'error');
+  }
 }
 
-function sendReply() {
-  showToast('Mail senden: Graph API Auth wird noch eingebaut', 'info');
+/* ========== ANTWORT SENDEN (Graph API) ========== */
+async function sendReply() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
+  var replyText = document.getElementById('reply-text').value.trim();
+  if (!replyText) { showToast('Antwort ist leer', 'info'); return; }
+
+  try {
+    showToast('Antwort wird gesendet...', 'info');
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/reply', {
+      method: 'POST',
+      body: JSON.stringify({ comment: replyText })
+    });
+    if (res && res.ok) {
+      showToast('Antwort gesendet', 'success');
+    } else {
+      var err = res ? await res.json() : {};
+      showToast('Senden fehlgeschlagen: ' + (err.error ? err.error.message : 'Unbekannt'), 'error');
+    }
+  } catch(e) {
+    showToast('Senden fehlgeschlagen: ' + e.message, 'error');
+  }
 }
 
+/* ========== ENTWURF SPEICHERN ========== */
 function saveDraft() {
-  showToast('Entwurf speichern: Graph API Auth wird noch eingebaut', 'info');
+  showToast('Entwurf-Funktion kommt bald', 'info');
 }
 
-function executeAll() {
-  showToast('Alles ausfuehren: Graph API Auth wird noch eingebaut', 'info');
+/* ========== ALLES AUSFUEHREN ========== */
+async function executeAll() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+
+  var steps = [];
+  var errors = [];
+
+  // 1. Mail verschieben (wenn Ordner gewaehlt)
+  var folderSel = document.getElementById('folder-select');
+  if (folderSel.value) {
+    steps.push('Mail verschieben');
+    try {
+      var moveRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
+        method: 'POST',
+        body: JSON.stringify({ destinationId: folderSel.value })
+      });
+      if (!moveRes || !moveRes.ok) errors.push('Mail verschieben fehlgeschlagen');
+    } catch(e) { errors.push('Mail verschieben: ' + e.message); }
+  }
+
+  // 2. Anhaenge hochladen (wenn vorhanden)
+  if (state.attachments.length > 0) {
+    steps.push('Anhaenge ablegen');
+    try { await uploadAllAttachments(); } catch(e) { errors.push('Upload: ' + e.message); }
+  }
+
+  // 3. Antwort senden (wenn Toggle an und Text vorhanden)
+  if (state.replyNeeded && document.getElementById('reply-text').value.trim()) {
+    steps.push('Antwort senden');
+    try { await sendReply(); } catch(e) { errors.push('Senden: ' + e.message); }
+  }
+
+  // 4. Feedback speichern
   saveFeedbackToStorage(true, '');
+
+  if (errors.length === 0) {
+    showToast('Alles erledigt! (' + steps.join(', ') + ')', 'success');
+  } else {
+    showToast('Teilweise erledigt. Fehler: ' + errors.join('; '), 'error');
+  }
 }
 
 /* ========== TOAST ========== */
