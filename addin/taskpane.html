@@ -552,71 +552,100 @@ function loadCachedFolders() {
 }
 
 /* ========== OUTLOOK ORDNER LADEN ========== */
+/* BEKANNTER BUG: Graph API childFolders gibt bei manchen Mailbox-Setups
+   0 Ergebnisse zurueck obwohl childFolderCount > 0 ist.
+   LOESUNG: "Rueckwaerts-Entdeckung" – Mails lesen, parentFolderIds sammeln,
+   dann fuer jede ID den Ordner-Namen abfragen. */
 async function loadOutlookFolders() {
   if (!state.graphToken) { populateFolderDropdown(); return; }
   try {
     outlookFolderMap = {};
     var allFolders = [];
+    var folderIds = new Set();
 
-    // Rekursiv Ordner laden mit includeHiddenFolders
-    async function loadChildren(parentId, parentPath, depth) {
-      if (depth > 5) return;
-      var url = 'https://graph.microsoft.com/v1.0/me/mailFolders/' + parentId
-        + '/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true';
+    // Schritt 1: Top-Level Ordner laden (funktioniert immer)
+    var topRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=200&$select=id,displayName,childFolderCount');
+    if (topRes && topRes.ok) {
+      var topData = await topRes.json();
+      (topData.value || []).forEach(function(f) {
+        outlookFolderMap[f.displayName] = f.id;
+        folderIds.add(f.id);
+      });
+    }
+
+    // Schritt 2: Rueckwaerts-Entdeckung – Mails lesen um Ordner-IDs zu finden
+    var url = 'https://graph.microsoft.com/v1.0/me/messages?$top=500&$select=parentFolderId';
+    var pages = 0;
+    while (url && pages < 5) {
       var res = await graphFetch(url);
-      if (!res || !res.ok) return;
+      if (!res || !res.ok) break;
       var data = await res.json();
-      var children = data.value || [];
-      for (var j = 0; j < children.length; j++) {
-        var c = children[j];
-        var fullPath = parentPath ? (parentPath + ' / ' + c.displayName) : c.displayName;
-        outlookFolderMap[fullPath] = c.id;
-        outlookFolderMap[c.displayName] = c.id;
-        allFolders.push({ name: c.displayName, id: c.id, parentName: parentPath, fullPath: fullPath });
-        if (c.childFolderCount > 0) {
-          await loadChildren(c.id, fullPath, depth + 1);
+      (data.value || []).forEach(function(m) {
+        if (m.parentFolderId) folderIds.add(m.parentFolderId);
+      });
+      url = data['@odata.nextLink'] || null;
+      pages++;
+    }
+    console.log(folderIds.size + ' Ordner-IDs aus ' + pages + ' Seiten Mails entdeckt');
+
+    // Schritt 3: Fuer jede entdeckte Ordner-ID den Namen + Parent abfragen
+    var ids = Array.from(folderIds);
+    for (var i = 0; i < ids.length; i++) {
+      if (outlookFolderMap[ids[i]]) continue; // Bereits als Name bekannt (umgekehrtes Lookup)
+      // Pruefen ob ID schon in allFolders ist
+      var alreadyLoaded = allFolders.some(function(f) { return f.id === ids[i]; });
+      if (alreadyLoaded) continue;
+
+      try {
+        var fRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + ids[i] + '?$select=id,displayName,parentFolderId,childFolderCount');
+        if (fRes && fRes.ok) {
+          var fData = await fRes.json();
+          outlookFolderMap[fData.displayName] = fData.id;
+          allFolders.push({ name: fData.displayName, id: fData.id, parentFolderId: fData.parentFolderId, fullPath: fData.displayName });
+          // Parent auch entdecken (falls noch nicht bekannt)
+          if (fData.parentFolderId && !folderIds.has(fData.parentFolderId)) {
+            folderIds.add(fData.parentFolderId);
+            ids.push(fData.parentFolderId);
+          }
         }
-      }
+      } catch(e) { /* Einzelner Ordner nicht ladbar, weiter */ }
     }
 
-    // Strategie: Alle Well-Known Folders + deren Kinder laden
-    // "msgfolderroot" ist der unsichtbare Root – alle Ordner sind dessen Kinder
-    var rootRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/msgfolderroot/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
-    if (!rootRes || !rootRes.ok) {
-      console.error('Root-Ordner laden fehlgeschlagen');
-      populateFolderDropdown();
-      return;
-    }
-    var rootData = await rootRes.json();
-    var rootFolders = rootData.value || [];
-
-    for (var i = 0; i < rootFolders.length; i++) {
-      var f = rootFolders[i];
-      outlookFolderMap[f.displayName] = f.id;
-      allFolders.push({ name: f.displayName, id: f.id, parentName: null, fullPath: f.displayName });
-      if (f.childFolderCount > 0) {
-        await loadChildren(f.id, f.displayName, 1);
+    // Schritt 4: Pfade aufbauen (Parent-Kind Beziehungen)
+    var idToFolder = {};
+    allFolders.forEach(function(f) { idToFolder[f.id] = f; });
+    // Auch Top-Level Ordner in allFolders aufnehmen falls noch nicht drin
+    Object.keys(outlookFolderMap).forEach(function(name) {
+      var id = outlookFolderMap[name];
+      if (!idToFolder[id]) {
+        var f = { name: name, id: id, parentFolderId: null, fullPath: name };
+        allFolders.push(f);
+        idToFolder[id] = f;
       }
-    }
+    });
 
-    // WICHTIG: Fuer jeden Top-Level-Ordner mit childFolderCount > 0
-    // muessen die Unterordner ueber die FOLDER-ID geladen werden
-    // (nicht ueber Well-Known-Names wie "inbox" – die funktionieren
-    // nicht bei allen Mailbox-Konfigurationen)
-    // Das passiert bereits oben in der Schleife via loadChildren().
-    // Hier nochmal sicherstellen dass Posteingang-Kinder geladen wurden:
-    var inboxFolder = allFolders.find(function(f) { return f.name === 'Posteingang' || f.name === 'Inbox'; });
-    if (inboxFolder && inboxFolder.id) {
-      var inboxChildren = allFolders.filter(function(f) { return f.parentName === (inboxFolder.name); });
-      if (inboxChildren.length === 0) {
-        console.log('Posteingang-Unterordner fehlend, lade via ID: ' + inboxFolder.id);
-        await loadChildren(inboxFolder.id, inboxFolder.name, 1);
+    // Vollstaendige Pfade berechnen
+    allFolders.forEach(function(f) {
+      var path = f.name;
+      var parentId = f.parentFolderId;
+      var visited = {};
+      while (parentId && idToFolder[parentId] && !visited[parentId]) {
+        visited[parentId] = true;
+        var parent = idToFolder[parentId];
+        // Nicht den Root-Ordner (msgfolderroot) oder Top-Level in Pfad aufnehmen
+        if (parent.name === 'Top of Information Store' || parent.name === 'Posteingang' || parent.name === 'Inbox') {
+          break;
+        }
+        path = parent.name + ' / ' + path;
+        parentId = parent.parentFolderId;
       }
-    }
+      f.fullPath = path;
+      outlookFolderMap[path] = f.id;
+    });
 
     populateFolderDropdownReal(allFolders);
     saveFolderCaches({ folders: allFolders, map: outlookFolderMap }, null);
-    console.log(allFolders.length + ' Outlook-Ordner geladen (inkl. alle Unterordner)');
+    console.log(allFolders.length + ' Outlook-Ordner entdeckt (Rueckwaerts-Methode)');
   } catch(e) {
     console.error('Ordner laden Fehler:', e);
     populateFolderDropdown();
