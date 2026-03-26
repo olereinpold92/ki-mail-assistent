@@ -211,6 +211,7 @@
       <div class="btn-row">
         <button class="btn btn-primary btn-sm" onclick="moveMailToFolder()">Mail verschieben</button>
         <button class="btn btn-danger btn-sm" onclick="deleteMailAndOptionalBlock()">Loeschen</button>
+        <button class="btn btn-outline btn-sm" onclick="addNewFolder()">+ Ordner</button>
       </div>
     </div>
   </div>
@@ -662,14 +663,67 @@ async function loadOutlookFolders() {
 }
 
 /* ========== ORDNER AUTOCOMPLETE ========== */
-function getKnownFolders() {
-  // Alle bekannten Ordner aus: API-Entdeckung + manuell gelernte
-  var folders = {};
-  // Aus outlookFolderMap (API)
-  Object.keys(outlookFolderMap).forEach(function(name) {
-    folders[name] = outlookFolderMap[name];
+// Feste Ordnerstruktur (manuell aus Oles Outlook, Stand 26.03.2026)
+var FOLDER_TREE = [
+  // Archiv
+  { path: '00_Archiv', children: ['Circle Health', 'GuadalaJARTE', 'Hernien Klinik', 'Hernienzentrum Koeln', 'Klinzing', 'kv-abrechnungspruefung', 'Nasenzentrum Sued-West', 'TrainerVenue'] },
+  // ToDo
+  { path: '01_ToDo', children: ['01_Wichtig & Dringend'] },
+  { path: '01_ToDo / 02_Wichtig', children: ['Website'] },
+  { path: '01_ToDo', children: ['03_Muss gemacht werden', '04_NTH'] },
+  // Nachhalten
+  { path: '02_Nachhalten', children: [] },
+  // Direkte Ordner
+  { path: 'BAG', children: [] },
+  { path: 'Business Development', children: ['Freelancer', 'PXA'] },
+  { path: 'Controlling', children: [] },
+  { path: 'Finanzbuchhaltung', children: [] },
+  // Firmen & Organisationen
+  { path: 'Firmen & Organisationen', children: ['Abrechnung', 'ATOS', 'Behoerden', 'Bestellungen', 'Elbklinik', 'FAK', 'Hafenklinik', 'Helios', 'Krankenkassen', 'Reisen', 'Versicherung'] },
+  // Weitere
+  { path: 'Hanse', children: [] },
+  { path: 'Hernia Consult', children: [] },
+  { path: 'Hernienmissionen', children: [] },
+  { path: 'HHC', children: [] },
+  { path: 'Hospitationen', children: [] },
+  { path: 'IT', children: ['Anleitungen'] },
+  { path: 'Kommunikation', children: ['hernie.de', 'hernie.net'] },
+  { path: 'KV', children: [] },
+  { path: 'Newsletter', children: [] },
+  { path: 'Personal', children: ['Bewerbungen', 'Offen'] },
+  { path: 'Persoenliches', children: [] },
+  { path: 'Politik', children: [] },
+  { path: 'Prozesse', children: [] },
+  { path: 'Rechtliches', children: [] },
+  { path: 'Sonstiges', children: [] },
+  { path: 'Strategie', children: [] },
+  { path: 'Wolle', children: [] }
+];
+
+function buildFolderList() {
+  // Flache Liste aus Baum bauen
+  var list = [];
+  FOLDER_TREE.forEach(function(node) {
+    list.push(node.path);
+    node.children.forEach(function(child) {
+      list.push(node.path + ' / ' + child);
+    });
   });
-  // Aus localStorage (gelernte Ordner)
+  return list;
+}
+
+function getKnownFolders() {
+  // Feste Liste + API-Entdeckung + manuell gelernte
+  var folders = {};
+  // 1. Feste Liste (immer verfuegbar, auch ohne API)
+  buildFolderList().forEach(function(name) {
+    folders[name] = outlookFolderMap[name] || '';
+  });
+  // 2. Aus API-Entdeckung
+  Object.keys(outlookFolderMap).forEach(function(name) {
+    if (!folders[name]) folders[name] = outlookFolderMap[name];
+  });
+  // 3. Aus localStorage (gelernte Ordner)
   try {
     var learned = JSON.parse(localStorage.getItem('ki_learned_folders') || '{}');
     Object.keys(learned).forEach(function(name) {
@@ -681,9 +735,6 @@ function getKnownFolders() {
 
 function getFilteredFolderList(query) {
   var folders = getKnownFolders();
-  var hideFolders = ['Synchronisierungsprobleme', 'RSS-Feeds', 'Postausgang', 'Junk-E-Mail',
-    'Entwürfe', 'Gelöschte Elemente', 'Gesendete Elemente', 'Social Activity',
-    'Top of Information Store', 'Posteingang', 'Archiv', 'Verlauf der Unterhaltung'];
 
   var results = [];
   var q = (query || '').toLowerCase();
@@ -769,6 +820,21 @@ function learnFolder(name, id) {
     // Auch in outlookFolderMap fuer die aktuelle Session
     outlookFolderMap[name] = id;
   } catch(e) {}
+}
+
+// Neuen Ordner hinzufuegen
+function addNewFolder() {
+  var name = document.getElementById('folder-input').value.trim();
+  if (!name) {
+    name = prompt('Ordnername eingeben (z.B. "Firmen & Organisationen / Neuer Kunde"):');
+  }
+  if (!name) return;
+  // In gelernte Ordner speichern
+  learnFolder(name, '');
+  document.getElementById('folder-input').value = name;
+  state.folder = name;
+  state.folderId = null;
+  showToast('Ordner "' + name + '" hinzugefuegt', 'success');
 }
 
 // Klick ausserhalb schliesst Suggestions
@@ -1169,6 +1235,9 @@ async function analyzeEmail() {
     + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
     + '=== GESPERRTE DOMAINS ===\n'
     + (function() { try { var b = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]'); return b.length > 0 ? b.join(', ') + '\nMails von diesen Domains: immer loeschen + absender_sperren: true\n\n' : 'Keine\n\n'; } catch(e) { return 'Keine\n\n'; } })()
+    + '=== VERFUEGBARE OUTLOOK-ORDNER ===\n'
+    + buildFolderList().join(', ') + '\n'
+    + 'Waehle bei Aktion "ablage" IMMER einen dieser Ordner. Bei ToDo/Nachhalten wird der Ordner automatisch gesetzt.\n\n'
     + '=== AKTIONS-SYSTEM ===\n'
     + 'Waehle GENAU EINE Aktion fuer diese Mail:\n'
     + '- "sofort": Muss Ole sofort erledigen, bleibt im Posteingang\n'
