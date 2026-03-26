@@ -488,16 +488,36 @@ async function debugFolders() {
     });
   }
 
-  // 3. Was gibt Inbox/childFolders zurueck?
+  // 3. Was gibt Inbox/childFolders zurueck? (Well-Known-Name)
   var res3 = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
   if (res3 && res3.ok) {
     var d3 = await res3.json();
-    log.push('\n=== inbox/childFolders ===');
+    log.push('\n=== inbox/childFolders (well-known) === ' + (d3.value || []).length + ' Ergebnisse');
     (d3.value || []).forEach(function(f) {
       log.push(f.displayName + ' (children: ' + f.childFolderCount + ')');
     });
   } else {
     log.push('\n=== inbox/childFolders FEHLER: ' + (res3 ? res3.status : 'null') + ' ===');
+    if (res3) { try { var errBody = await res3.text(); log.push('Response: ' + errBody.substring(0, 300)); } catch(e){} }
+  }
+
+  // 4. Posteingang per ID finden und dessen childFolders laden
+  var posteingang = (d1.value || []).find(function(f) { return f.displayName === 'Posteingang'; });
+  if (posteingang) {
+    log.push('\n=== Posteingang per ID: ' + posteingang.id.substring(0,30) + '... ===');
+    var res4 = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/' + posteingang.id + '/childFolders?$top=200&$select=id,displayName,childFolderCount&includeHiddenFolders=true');
+    if (res4 && res4.ok) {
+      var d4 = await res4.json();
+      log.push((d4.value || []).length + ' Unterordner gefunden:');
+      (d4.value || []).forEach(function(f) {
+        log.push('  ' + f.displayName + ' (children: ' + f.childFolderCount + ')');
+      });
+    } else {
+      log.push('FEHLER: ' + (res4 ? res4.status : 'null'));
+      if (res4) { try { var errBody2 = await res4.text(); log.push('Response: ' + errBody2.substring(0, 300)); } catch(e){} }
+    }
+  } else {
+    log.push('\n=== Kein Ordner "Posteingang" gefunden ===');
   }
 
   // Ergebnis anzeigen
@@ -579,14 +599,18 @@ async function loadOutlookFolders() {
       }
     }
 
-    // Zusaetzlich: Unterordner von Posteingang/Inbox direkt laden
-    // (manche Setups haben Ordner unter Inbox die nicht unter msgfolderroot erscheinen)
-    var inboxId = outlookFolderMap['Posteingang'] || outlookFolderMap['Inbox'];
-    if (inboxId) {
-      var inboxChildren = allFolders.filter(function(f) { return f.parentName === 'Posteingang' || f.parentName === 'Inbox'; });
+    // WICHTIG: Fuer jeden Top-Level-Ordner mit childFolderCount > 0
+    // muessen die Unterordner ueber die FOLDER-ID geladen werden
+    // (nicht ueber Well-Known-Names wie "inbox" – die funktionieren
+    // nicht bei allen Mailbox-Konfigurationen)
+    // Das passiert bereits oben in der Schleife via loadChildren().
+    // Hier nochmal sicherstellen dass Posteingang-Kinder geladen wurden:
+    var inboxFolder = allFolders.find(function(f) { return f.name === 'Posteingang' || f.name === 'Inbox'; });
+    if (inboxFolder && inboxFolder.id) {
+      var inboxChildren = allFolders.filter(function(f) { return f.parentName === (inboxFolder.name); });
       if (inboxChildren.length === 0) {
-        // Unterordner von Posteingang wurden noch nicht geladen
-        await loadChildren(inboxId, 'Posteingang', 1);
+        console.log('Posteingang-Unterordner fehlend, lade via ID: ' + inboxFolder.id);
+        await loadChildren(inboxFolder.id, inboxFolder.name, 1);
       }
     }
 
