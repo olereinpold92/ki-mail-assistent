@@ -1752,7 +1752,8 @@ function onOdSearch() {
         div.onmouseover = function() { div.style.background = '#e8f0fe'; };
         div.onmouseout = function() { div.style.background = 'white'; };
         div.innerHTML = '<div style="font-size:12px;font-weight:600;">&#128193; ' + f.name + '</div>'
-          + '<div style="font-size:10px;color:#0078d4;margin-top:2px;word-break:break-all;">' + fullPath + '</div>';
+          + '<div style="font-size:10px;color:#0078d4;margin-top:2px;word-break:break-all;">' + fullPath + '</div>'
+          + '<div style="font-size:9px;color:#999;margin-top:1px;word-break:break-all;">DEBUG: ' + (f.parentReference ? f.parentReference.path || 'kein path' : 'kein parentRef') + '</div>';
         div.onclick = function() {
           odSelectedFolderId = f.id;
           odCurrentPath = [];
