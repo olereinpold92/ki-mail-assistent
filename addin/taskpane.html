@@ -82,6 +82,15 @@
     .execute-all { margin: 8px; }
     .execute-all .btn { width: 100%; padding: 12px; font-size: 14px; }
 
+    /* Analyze bar (always visible at top) */
+    .analyze-bar { margin: 8px; display: flex; gap: 6px; align-items: center; }
+    .analyze-bar .btn { flex: 1; padding: 10px; font-size: 13px; }
+    .analyze-bar .mail-info { flex: 1; font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .analyze-bar .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .analyze-bar .status-dot.new { background: #0078d4; }
+    .analyze-bar .status-dot.cached { background: #107c10; }
+    .analyze-bar .status-dot.old { background: #f57c00; }
+
     /* Analysis collapsible */
     .analysis-text { font-size: 12px; line-height: 1.5; color: #555; white-space: pre-wrap; }
 
@@ -121,6 +130,14 @@
 
 <!-- Main content (hidden until loaded) -->
 <div id="main-content" style="display:none">
+
+  <!-- Analyze bar (always visible) -->
+  <div class="analyze-bar" id="analyze-bar">
+    <span class="status-dot new" id="analyze-dot"></span>
+    <span class="mail-info" id="analyze-mail-info">Mail wird geladen...</span>
+    <button class="btn btn-primary" id="btn-analyze-top" onclick="startAnalysis(false)">Jetzt analysieren</button>
+    <button class="btn btn-outline btn-sm" id="btn-reanalyze-top" onclick="startAnalysis(true)" style="display:none">Neu</button>
+  </div>
 
   <!-- Priority -->
   <div class="section" id="sec-prio">
@@ -281,6 +298,15 @@ Office.onReady(function(info) {
     loadGedaechtnis().then(function() {
       readMailData();
     });
+
+    // Pinning: Wenn der Nutzer eine andere Mail anklickt, automatisch neu laden
+    if (Office.context.mailbox.addHandlerAsync) {
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function() {
+        // Neue Mail ausgewaehlt – UI zuruecksetzen und neu laden
+        resetUIForNewMail();
+        readMailData();
+      });
+    }
   } else {
     document.getElementById('loading-text').textContent = 'Nicht in Outlook geoeffnet. Bitte Mail in Outlook oeffnen.';
   }
@@ -332,6 +358,42 @@ async function loadGedaechtnis() {
   }
 }
 
+/* ========== UI RESET BEI MAIL-WECHSEL ========== */
+function resetUIForNewMail() {
+  // State zuruecksetzen
+  state.analysis = null;
+  state.prio = '';
+  state.folder = '';
+  state.replyNeeded = false;
+  state.replyText = '';
+  state.tasks = [];
+  state.attachments = [];
+
+  // UI zuruecksetzen
+  document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('folder-select').selectedIndex = 0;
+  document.getElementById('reply-toggle').checked = false;
+  document.getElementById('reply-label').textContent = 'Keine Antwort noetig';
+  document.getElementById('reply-area').style.display = 'none';
+  document.getElementById('reply-text').value = '';
+  document.getElementById('task-list').innerHTML = '';
+  document.getElementById('analysis-text').textContent = 'Noch nicht analysiert.';
+  document.getElementById('att-list').innerHTML = '';
+  document.getElementById('sec-attachments').style.display = 'none';
+  document.getElementById('fb-detail').style.display = 'none';
+  document.getElementById('mail-age-warning').style.display = 'none';
+
+  // Top-Button zuruecksetzen
+  document.getElementById('btn-analyze-top').style.display = 'inline-block';
+  document.getElementById('btn-analyze-top').disabled = false;
+  document.getElementById('btn-reanalyze-top').style.display = 'none';
+  document.getElementById('analyze-dot').className = 'status-dot new';
+
+  // Alte Analyse-Buttons zuruecksetzen
+  document.getElementById('btn-analyze').style.display = 'inline-block';
+  document.getElementById('btn-reanalyze').style.display = 'none';
+}
+
 /* ========== MAIL DATEN LESEN ========== */
 function readMailData() {
   var item = Office.context.mailbox.item;
@@ -381,11 +443,15 @@ function onMailLoaded() {
     renderAttachments();
   }
 
+  // Mail-Info im Analyze-Bar anzeigen
+  document.getElementById('analyze-mail-info').textContent = state.from + ': ' + state.subject;
+
   // KI-Analyse: NICHT automatisch starten – Kosten-Schutz
   var claudeKey = localStorage.getItem('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) {
     document.getElementById('analysis-text').textContent = 'Kein Claude API Key. Bitte in Einstellungen eintragen.';
     document.getElementById('btn-analyze').disabled = true;
+    document.getElementById('btn-analyze-top').disabled = true;
     showToast('Claude API Key fehlt – bitte in Einstellungen eintragen', 'info');
   } else {
     // Pruefen ob Mail alt ist (aelter als heute)
@@ -409,13 +475,19 @@ function onMailLoaded() {
       document.getElementById('analysis-text').textContent += '\n(aus Cache geladen – kein API-Call)';
       document.getElementById('btn-analyze').style.display = 'none';
       document.getElementById('btn-reanalyze').style.display = 'inline-block';
+      // Top-Button: nur "Neu" zeigen
+      document.getElementById('btn-analyze-top').style.display = 'none';
+      document.getElementById('btn-reanalyze-top').style.display = 'inline-block';
+      document.getElementById('analyze-dot').className = 'status-dot cached';
     } else if (isOldMail) {
       // Alte Mail – Warnung zeigen, nicht automatisch analysieren
       document.getElementById('analysis-text').textContent = 'Alte Mail – nicht automatisch analysiert.';
       document.getElementById('mail-age-warning').style.display = 'block';
+      document.getElementById('analyze-dot').className = 'status-dot old';
     } else {
       // Neue Mail, kein Cache – Button anzeigen, NICHT automatisch starten
       document.getElementById('analysis-text').textContent = 'Klicke "Jetzt analysieren" um die KI-Analyse zu starten.';
+      document.getElementById('analyze-dot').className = 'status-dot new';
     }
   }
 }
@@ -593,6 +665,10 @@ async function analyzeEmail() {
     document.getElementById('btn-analyze').style.display = 'none';
     document.getElementById('btn-reanalyze').style.display = 'inline-block';
     document.getElementById('mail-age-warning').style.display = 'none';
+    // Top-Button umschalten
+    document.getElementById('btn-analyze-top').style.display = 'none';
+    document.getElementById('btn-reanalyze-top').style.display = 'inline-block';
+    document.getElementById('analyze-dot').className = 'status-dot cached';
 
   } catch(e) {
     console.error('Analyse-Fehler:', e);
