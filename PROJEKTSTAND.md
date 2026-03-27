@@ -139,6 +139,7 @@ ki-mail-assistent/
 - Tenant ID: 710620de-9a6b-4cca-bf53-99ce2a3e407f
 - Redirect URIs (SPA): http://localhost:8080, https://localhost:3000, https://localhost:3000/addin/taskpane.html
 - Berechtigungen: User.Read, Mail.ReadWrite, Mail.Send, Files.ReadWrite, Tasks.ReadWrite – alle erteilt
+- FEHLEND: MailboxSettings.ReadWrite – noetig fuer Sperren-Feature (Posteingangsregeln erstellen)
 
 ## Entschiedene Punkte – NICHT nochmal diskutieren
 - Outlook Add-in statt Web-App: ENTSCHIEDEN (25.03.2026)
@@ -153,9 +154,11 @@ ki-mail-assistent/
 - OneDrive-Ordner per Graph API: FUNKTIONIERT (kein Bug wie bei Mail-Ordnern)
 - Antworten NIE automatisch senden: IMMER nur in Outlook oeffnen
 - Microsoft To Do fuer Aufgaben: ENTSCHIEDEN, parallel zu E-Mail-Ordner-System
-- API-Kostenschutz: Analyse nur manuell, nie automatisch, nie doppelt
+- API-Kostenschutz: Analyse nur manuell, nie automatisch, nie doppelt (Ole hat Auto-Analyse getestet und wieder deaktiviert)
 
-## Neue Features (Session 26.03.2026 abends)
+## Session 27.03.2026: KI-Chat, Persistenz, Sperren-Feature
+
+### Neue Features
 - **KI-Chat**: "KI fragen" Bereich – Fragen zur aktuellen Mail stellen, mit Dokumenten-Suche
   - Tool Use: KI kann selbststaendig Mails in Outlook-Ordnern durchsuchen
   - PDF-Analyse: Anhaenge werden direkt an Claude geschickt und gelesen
@@ -164,6 +167,29 @@ ki-mail-assistent/
 - **Server.py erweitert**: POST-Endpunkt fuer Gedaechtnis-Dateien (Whitelist)
 - **Persistenz**: Feedback, Analysis-Log und Chat-Verlaeufe werden auf Festplatte gespeichert
 - **Chat-Prompt**: KI als Sparringspartner (challengen, nicht nach dem Mund reden)
+- **Sperren-Buttons**: Zwei Buttons oben im Add-in: "Sperren: absender@..." und "Sperren: @domain"
+  - Erstellt Posteingangsregel in Microsoft 365 (kontogebunden, nicht nur lokal)
+  - Verschiebt aktuelle Mail in Junk-E-Mail
+- **Abmelden-Button**: Im Header, loescht MSAL-Cache komplett (kein Browser-Umweg noetig)
+- **Antwort-Modus als Auswahl**: Antworten/Allen antworten/Weiterleiten als Toggle-Buttons statt direkte Aktion
+- **Aufgaben editierbar**: Tasks koennen bearbeitet und geloescht werden
+
+### Offene Bugs (DRINGEND, als naechstes fixen)
+1. **Microsoft Login Popup oeffnet sich im Browser statt im Add-in**: Das Popup-Fenster
+   zeigt "localhost hat die Verbindung verweigert" wenn das selbstsignierte Zertifikat
+   im Browser nicht akzeptiert wurde. Einmalig https://localhost:3000 im Browser oeffnen
+   und Zertifikat akzeptieren. LANGFRISTIGE LOESUNG: Office.context.ui.displayDialogAsync
+   verwenden statt window.open fuer den Login.
+2. **Sperren-Feature braucht MailboxSettings.ReadWrite Berechtigung**: Muss in Azure Portal
+   hinzugefuegt und Admin-Consent erteilt werden. Alternativ: Regel nur lokal speichern
+   und manuell in Outlook-Regeln anlegen.
+3. **Mail wird nicht in gewaehlten Ordner verschoben**: Bei Aktion "sofort"/"erledigen"
+   wird die Mail nie verschoben, auch wenn ein Ordner explizit gewaehlt wurde. Fix:
+   Verschiebung ausfuehren wenn ein Ordner eingetragen ist, egal welche Aktion.
+4. **OneDrive-Upload bei "Alles ausfuehren"**: Muss getestet werden ob Anhaenge korrekt
+   in den ausgewaehlten OneDrive-Ordner hochgeladen werden.
+5. **Felder werden zurueckgesetzt bei UI-Interaktion**: Wenn man in ein Textfeld klickt,
+   werden andere Sektionen automatisch zugeklappt (expandField-Problem).
 
 ## Gedaechtnis-Architektur: Umbau auf Tag-System (entschieden 26.03.2026)
 - **Alt**: Ordner-Hierarchie (profil/, regeln/, kontakte/) mit "immer" oder "bei_bedarf"

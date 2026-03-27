@@ -77,6 +77,7 @@ Details: Siehe KONZEPT.md Abschnitt 5.
 - Tenant ID: 710620de-9a6b-4cca-bf53-99ce2a3e407f
 - Redirect URIs (SPA): http://localhost:8080, https://localhost:3000, https://localhost:3000/addin/taskpane.html
 - Berechtigungen: User.Read, Mail.ReadWrite, Mail.Send, Files.ReadWrite, Tasks.ReadWrite – alle erteilt
+- FEHLEND: MailboxSettings.ReadWrite – noetig fuer Sperren-Feature (Posteingangsregeln)
 
 ## Microsoft 365 Setup
 - Postfach: o.reinpold@hernie.de (Microsoft 365 Business Standard)

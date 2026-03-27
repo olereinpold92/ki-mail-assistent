@@ -170,6 +170,7 @@
   <span>KI Mail Assistent</span>
   <div class="header-btns">
     <button class="header-btn" id="btn-connect" onclick="connectMicrosoft()"><span class="conn-dot disconnected" id="conn-dot"></span>Verbinden</button>
+    <button class="header-btn" id="btn-disconnect" onclick="disconnectMicrosoft()" style="display:none;background:rgba(255,100,100,0.3);">Abmelden</button>
     <button class="header-btn" onclick="toggleConfig()">Einstellungen</button>
   </div>
 </div>
@@ -186,10 +187,13 @@
 
   <!-- Analyze bar (always visible) -->
   <div class="analyze-bar" id="analyze-bar">
-    <span class="status-dot new" id="analyze-dot"></span>
-    <span class="mail-info" id="analyze-mail-info">Mail wird geladen...</span>
     <button class="btn btn-primary" id="btn-analyze-top" onclick="startAnalysis(false)">Jetzt analysieren</button>
     <button class="btn btn-outline btn-sm" id="btn-reanalyze-top" onclick="startAnalysis(true)" style="display:none">Neu</button>
+  </div>
+  <!-- Sperren-Leiste (Absender oder Domain, je ein Klick) -->
+  <div style="margin:0 8px 4px;display:flex;gap:4px;">
+    <button id="qb-sender-btn" onclick="executeQuickBlock('sender')" style="flex:1;background:#d32f2f;color:white;border:none;padding:5px 6px;font-size:11px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sperren: Absender</button>
+    <button id="qb-domain-btn" onclick="executeQuickBlock('domain')" style="flex:1;background:#b71c1c;color:white;border:none;padding:5px 6px;font-size:11px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sperren: Domain</button>
   </div>
 
   <!-- Aktion (was soll mit der Mail passieren) -->
@@ -400,7 +404,7 @@ var state = {
 var outlookFolderMap = {};   // displayName -> folder ID
 var oneDriveFolderMap = {};  // path -> driveItem ID
 var msalInstance = null;
-var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite', 'Tasks.ReadWrite'];
+var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite', 'Tasks.ReadWrite', 'MailboxSettings.ReadWrite'];
 
 /* ========== MSAL AUTH ========== */
 function initMsal() {
@@ -434,7 +438,6 @@ async function autoConnect() {
       // Ordner aktualisieren wenn aelter als 30 Min oder noch nie geladen
       var lastLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
       if (Date.now() - lastLoad > 1800000) {
-        // Im Hintergrund, nicht blockierend
         loadOutlookFolders();
         loadOneDriveFolders();
       }
@@ -472,16 +475,11 @@ async function connectMicrosoft() {
     }
     updateConnectionUI(true);
     showToast('Mit Microsoft verbunden', 'success');
-    // Ordner jetzt frisch laden (manueller Connect)
     loadOutlookFolders();
     loadOneDriveFolders();
   } catch(e) {
     console.error('MSAL Fehler:', e);
-    if (e.message && e.message.includes('popup')) {
-      showToast('Popup blockiert – bitte Popup-Blocker fuer localhost deaktivieren', 'error');
-    } else {
-      showToast('Microsoft-Anmeldung fehlgeschlagen: ' + e.message, 'error');
-    }
+    showToast('Anmeldung fehlgeschlagen: ' + e.message, 'error');
   }
 }
 
@@ -497,12 +495,13 @@ async function getGraphToken() {
     state.graphToken = result.accessToken;
     return result.accessToken;
   } catch(e) {
+    // Token abgelaufen – Popup fuer Erneuerung
     try {
       var result = await msalInstance.acquireTokenPopup({ scopes: graphScopes });
       state.graphToken = result.accessToken;
       return result.accessToken;
     } catch(e2) {
-      showToast('Token-Erneuerung fehlgeschlagen', 'error');
+      showToast('Token-Erneuerung fehlgeschlagen. Bitte abmelden und neu verbinden.', 'error');
       updateConnectionUI(false);
       return null;
     }
@@ -532,14 +531,46 @@ async function graphFetch(url, options) {
 function updateConnectionUI(connected) {
   var dot = document.getElementById('conn-dot');
   var btn = document.getElementById('btn-connect');
+  var btnDisconnect = document.getElementById('btn-disconnect');
   if (connected) {
     dot.className = 'conn-dot connected';
     btn.innerHTML = '<span class="conn-dot connected" id="conn-dot"></span>Verbunden';
+    if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
   } else {
     dot.className = 'conn-dot disconnected';
     btn.innerHTML = '<span class="conn-dot disconnected" id="conn-dot"></span>Verbinden';
+    if (btnDisconnect) btnDisconnect.style.display = 'none';
     state.graphToken = null;
   }
+}
+
+function disconnectMicrosoft() {
+  // Komplett aufraeumen – kein Popup noetig
+  state.graphToken = null;
+
+  // MSAL-Cache loeschen (alle Keys die mit msal. beginnen)
+  var keysToRemove = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key && (key.indexOf('msal') === 0 || key.indexOf('login.windows') >= 0 || key.indexOf('-login.microsoftonline.com-') >= 0)) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+
+  // Session Storage auch
+  var sessionKeysToRemove = [];
+  for (var j = 0; j < sessionStorage.length; j++) {
+    var skey = sessionStorage.key(j);
+    if (skey && (skey.indexOf('msal') === 0 || skey.indexOf('login.windows') >= 0)) {
+      sessionKeysToRemove.push(skey);
+    }
+  }
+  sessionKeysToRemove.forEach(function(k) { sessionStorage.removeItem(k); });
+
+  msalInstance = null;
+  updateConnectionUI(false);
+  showToast('Abgemeldet. Bitte neu verbinden.', 'success');
 }
 
 // Ordner manuell neu laden (Cache loeschen + frisch von API)
@@ -1425,6 +1456,7 @@ function readMailData() {
   state.subject = item.subject || '(kein Betreff)';
   state.from = item.from ? item.from.displayName : 'Unbekannt';
   state.fromEmail = item.from ? item.from.emailAddress : '';
+  updateQuickBlockButtons();
   state.mailId = item.itemId;
   // EWS-ID in REST-ID konvertieren (Graph API braucht REST-Format)
   try {
@@ -1885,6 +1917,83 @@ function updateBlockSenderUI() {
 
 function onBlockToggle() {
   state.blockSender = document.getElementById('block-sender-toggle').checked;
+}
+
+// ========== SCHNELL-SPERREN ==========
+function updateQuickBlockButtons() {
+  if (!state.fromEmail) return;
+  var domain = state.fromEmail.split('@')[1] || '';
+  document.getElementById('qb-sender-btn').textContent = 'Sperren: ' + state.fromEmail;
+  document.getElementById('qb-domain-btn').textContent = 'Sperren: @' + domain;
+}
+
+async function executeQuickBlock(mode) {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'error'); return; }
+  if (!state.fromEmail) { showToast('Keine Mail geladen', 'error'); return; }
+
+  var domain = state.fromEmail.split('@')[1] || '';
+  var blockValue = mode === 'domain' ? domain : state.fromEmail;
+  var blockLabel = mode === 'domain' ? '@' + domain : state.fromEmail;
+
+  showToast('Sperre ' + blockLabel + '...', 'info');
+
+  try {
+    // 1. Posteingangsregel in Microsoft 365 erstellen (kontogebunden, nicht lokal)
+    var ruleBody = {
+      displayName: 'Gesperrt: ' + blockLabel,
+      sequence: 1,
+      isEnabled: true,
+      conditions: {},
+      actions: {
+        moveToFolder: 'junkemail',
+        stopProcessingRules: true
+      }
+    };
+
+    if (mode === 'domain') {
+      // Domain sperren: senderContains prueft den Absender-String
+      ruleBody.conditions.senderContains = ['@' + domain];
+    } else {
+      // Einzelnen Absender sperren
+      ruleBody.conditions.fromAddresses = [{
+        emailAddress: { address: state.fromEmail }
+      }];
+    }
+
+    var ruleRes = await graphFetch('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messageRules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ruleBody)
+    });
+
+    if (!ruleRes || !ruleRes.ok) {
+      var errData = ruleRes ? await ruleRes.json().catch(function() { return {}; }) : {};
+      throw new Error('Regel konnte nicht erstellt werden: ' + (errData.error ? errData.error.message : 'HTTP ' + (ruleRes ? ruleRes.status : 'null')));
+    }
+
+    // 2. Aktuelle Mail in Junk verschieben
+    if (state.restMailId) {
+      var moveRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destinationId: 'junkemail' })
+      });
+      if (!moveRes || !moveRes.ok) {
+        console.warn('[QuickBlock] Mail konnte nicht in Junk verschoben werden');
+      }
+    }
+
+    // 3. Lokal merken (fuer KI-Analyse)
+    var blocked = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]');
+    if (blocked.indexOf(blockValue) < 0) blocked.push(blockValue);
+    localStorage.setItem('ki_blocked_domains', JSON.stringify(blocked));
+
+    showToast(blockLabel + ' gesperrt + Mail in Junk', 'success');
+
+  } catch(e) {
+    console.error('[QuickBlock] Fehler:', e);
+    showToast('Fehler: ' + e.message, 'error');
+  }
 }
 
 function onReplyToggle() {
