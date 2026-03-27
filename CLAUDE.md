@@ -1,32 +1,12 @@
-# CLAUDE.md – KI Mail Assistent fuer Ole Reinpold (EHC Hamburg)
+# CLAUDE.md – KI Mail Assistent (Tool-spezifisch)
 
-Lies diese Datei IMMER komplett bevor du irgendetwas tust.
-Lies danach PROJEKTSTAND.md und KONZEPT.md fuer den vollstaendigen Kontext.
-
-## Wer ist Ole?
-- Ole Reinpold, Ansprache: Du, Sprache: immer Deutsch
-- Prokurist/GF: Elbe Hernien Centrum EHC GmbH (Hamburger Hernien Centrum), ~8 Mitarbeiter, Hernienchirurgie
-- Mitgruender/GF: Qodia GmbH (KI-Loesungen GOAe-Abrechnung), 4 Gruender
-- Kein Entwickler. BWLer, technikaffin (6-7/10). Braucht klare Anweisungen ohne Fachjargon.
-- Will als Sparringspartner gefordert werden – challenge Ole aktiv wenn er auf dem falschen Weg ist.
-- Tendenz: Verbeisst sich manchmal zu lang in Themen (eigene Einschaetzung).
-- Langfristiges Ziel: Gesamten Arbeitsalltag automatisieren. E-Mail ist Schritt 1.
-
-## Wie wir zusammenarbeiten (IMMER einhalten)
-- Du bist Sparringspartner UND Umsetzer. Ole erwartet beides.
-- Challenge Ole aktiv – hinterfrage Entscheidungen, weise auf Risiken hin.
-- Erklaere jeden Schritt klar bevor du ihn ausfuehrst
-- Wenn Ole sagt "Stopp" oder "warte" – sofort aufhoeren
-- Wenn du unsicher bist: sag es direkt, recherchiere, gib dann eine klare Empfehlung
-- Triff keine Annahmen ueber was Ole will – frag lieber einmal zu viel
-- Nach jeder Session: CLAUDE.md und PROJEKTSTAND.md aktualisieren
-- ALLE Arbeitsergebnisse muessen in Dateien stehen, NIE nur im Chat-Kontext
-- WICHTIG: Am Ende jeder Session IMMER Git Commit machen damit nichts verloren geht
-- WICHTIG: Niemals E-Mails automatisch senden – IMMER nur in Outlook oeffnen
+Lies ZUERST die CLAUDE.md im ehc-shared Repo fuer die allgemeinen Arbeitsregeln.
+Pfad: Siehe shared-path.config in diesem Repo.
+Lies danach diese Datei fuer Mail-Assistent-spezifische Regeln.
 
 ## Was dieses Projekt ist
 Ein Outlook Add-in das als Seitenleiste in Outlook laeuft und Ole hilft, seine E-Mails schneller abzuarbeiten.
-Es nutzt ein lokales "Gedaechtnis" (Textdateien) das der KI bei jeder Analyse mitgegeben wird.
+Es nutzt ein geteiltes "Gedaechtnis" (Textdateien in ehc-shared/gedaechtnis/) das der KI bei jeder Analyse mitgegeben wird.
 
 ### Was der Assistent pro Mail tut:
 1. Aktion vorschlagen: Sofort / Erledigen / ToDo Wichtig / ToDo NTH / Nachhalten / Ablage / Loeschen
@@ -55,6 +35,7 @@ Es nutzt ein lokales "Gedaechtnis" (Textdateien) das der KI bei jeder Analyse mi
 - Domain-Sperren Toggle nur sichtbar wenn Aktion "Loeschen" gewaehlt
 - Antwort NIE automatisch senden – IMMER in Outlook oeffnen (Reply All als Standard)
 - API-Kostenschutz: Analyse nur manuell, nie automatisch, nie doppelt
+- WICHTIG: Niemals E-Mails automatisch senden – IMMER nur in Outlook oeffnen
 
 ## Architektur: Outlook Add-in
 - Outlook Add-in (Seitenleiste) statt eigener Web-App
@@ -62,15 +43,9 @@ Es nutzt ein lokales "Gedaechtnis" (Textdateien) das der KI bei jeder Analyse mi
 - Lokaler HTTPS-Server (Python, Port 3000) – kann lesen UND schreiben
 - MSAL.js lokal eingebunden (nicht ueber CDN)
 - manifest.xml fuer Outlook Sideloading
-- Gedaechtnis-System: Tag-basierte entries.json + Textdateien unter /gedaechtnis/
+- Gedaechtnis liegt in ehc-shared/gedaechtnis/ (Pfad via shared-path.config)
+- server.py leitet /gedaechtnis/-Anfragen auf das Shared-Verzeichnis um
 - KI-Chat: Diskussion mit KI ueber Mails, inkl. Dokumenten-Suche via Tool Use
-
-## Gedaechtnis-Architektur (entschieden 26.03.2026)
-Zwei strikt getrennte Ebenen:
-- **Systemverhalten** (WIE die KI arbeitet): Fest im Prompt, aendert sich nur bewusst
-- **Gelerntes Wissen** (WAS Ole wichtig ist): In entries.json, waechst automatisch
-Gelerntes Wissen wird per **Tag-Matching** selektiv geladen (nicht alles bei jeder Mail).
-Details: Siehe KONZEPT.md Abschnitt 5.
 
 ## Azure Konfiguration
 - Client ID: aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0
@@ -103,7 +78,6 @@ Details: Siehe KONZEPT.md Abschnitt 5.
 ## Entschiedene Punkte – nicht nochmal diskutieren
 - Outlook Add-in statt Web-App: ENTSCHIEDEN (25.03.2026)
 - n8n/Make/Power Automate: VERWORFEN
-- Claude Code als Entwicklungsumgebung: ENTSCHIEDEN
 - Ein-Datei-Ansatz (taskpane.html): BEIBEHALTEN
 - Claude API Key im localStorage: akzeptiertes Risiko
 - Microsoft To Do fuer Aufgaben: ENTSCHIEDEN (parallel zu E-Mail-Ordner-System)

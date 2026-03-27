@@ -10,7 +10,21 @@ CERT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'certs')
 CERT_FILE = os.path.join(CERT_DIR, 'localhost.crt')
 KEY_FILE = os.path.join(CERT_DIR, 'localhost.key')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-GEDAECHTNIS_DIR = os.path.join(BASE_DIR, 'gedaechtnis')
+
+# Shared-Verzeichnis: Liest Pfad aus shared-path.config (fuer geteiltes Gedaechtnis)
+# Fallback: BASE_DIR (altes Verhalten, falls Config nicht existiert)
+SHARED_CONFIG = os.path.join(BASE_DIR, 'shared-path.config')
+if os.path.exists(SHARED_CONFIG):
+    with open(SHARED_CONFIG, 'r', encoding='utf-8') as f:
+        SHARED_DIR = f.read().strip()
+    if not os.path.isdir(SHARED_DIR):
+        print(f"WARNUNG: Shared-Pfad existiert nicht: {SHARED_DIR}")
+        print(f"Fallback auf lokales Verzeichnis: {BASE_DIR}")
+        SHARED_DIR = BASE_DIR
+else:
+    SHARED_DIR = BASE_DIR
+
+GEDAECHTNIS_DIR = os.path.join(SHARED_DIR, 'gedaechtnis')
 
 if not os.path.exists(CERT_FILE) or not os.path.exists(KEY_FILE):
     print("FEHLER: Zertifikate nicht gefunden in", CERT_DIR)
@@ -34,6 +48,15 @@ ALLOWED_WRITE_PATHS = [
 class GedaechtnisHandler(http.server.SimpleHTTPRequestHandler):
     """Erweiterter Handler: Kann Dateien lesen UND in gedaechtnis/ schreiben."""
 
+    def translate_path(self, path):
+        """Leitet /gedaechtnis/-Anfragen auf SHARED_DIR um."""
+        # Nur /gedaechtnis/ umleiten, alles andere normal servieren
+        if path.startswith('/gedaechtnis/') or path == '/gedaechtnis':
+            # Pfad relativ zu SHARED_DIR aufloesen
+            rel = path[1:]  # Fuehrenden / entfernen
+            return os.path.join(SHARED_DIR, rel.replace('/', os.sep))
+        return super().translate_path(path)
+
     def do_POST(self):
         # Nur /api/gedaechtnis erlaubt
         if not self.path.startswith('/api/gedaechtnis/'):
@@ -53,8 +76,8 @@ class GedaechtnisHandler(http.server.SimpleHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length)
 
-        # Datei schreiben
-        full_path = os.path.join(BASE_DIR, target)
+        # Datei schreiben (in SHARED_DIR, nicht BASE_DIR)
+        full_path = os.path.join(SHARED_DIR, target)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
         try:
