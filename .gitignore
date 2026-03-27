@@ -1,0 +1,5 @@
+# Selbstsignierte Zertifikate (maschinenspezifisch)
+certs/
+
+# Claude Code Worktrees (maschinenspezifisch)
+.claude/
