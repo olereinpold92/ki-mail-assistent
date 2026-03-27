@@ -170,7 +170,7 @@
   <span>KI Mail Assistent</span>
   <div class="header-btns">
     <button class="header-btn" id="btn-connect" onclick="connectMicrosoft()"><span class="conn-dot disconnected" id="conn-dot"></span>Verbinden</button>
-    <button class="header-btn" id="btn-disconnect" onclick="disconnectMicrosoft()" style="display:none;background:rgba(255,100,100,0.3);">Abmelden</button>
+    <button class="header-btn" id="btn-disconnect" onclick="disconnectMicrosoft()" style="background:rgba(255,100,100,0.3);">Abmelden</button>
     <button class="header-btn" onclick="toggleConfig()">Einstellungen</button>
   </div>
 </div>
@@ -269,16 +269,23 @@
     <div class="section-head" onclick="toggleSection('sec-attachments')">Anhaenge <span class="arrow">▼</span></div>
     <div class="section-body">
       <div id="att-list"></div>
-      <div id="onedrive-selected" style="display:none;margin:6px 0;padding:6px 8px;background:#e8f0fe;border-radius:4px;font-size:12px;cursor:pointer;" onclick="toggleOdBrowser()">
-        <span style="color:#666;">Ordner:</span> <strong id="onedrive-selected-path"></strong> <span style="color:#999;font-size:10px;">&#9998; aendern</span>
-      </div>
-      <div id="onedrive-browser-wrap">
+      <div id="onedrive-browser-wrap" style="display:none;margin-top:6px;padding:8px;background:#f5f5f5;border-radius:4px;">
+        <div style="font-size:11px;color:#666;margin-bottom:4px;">Ordner waehlen fuer: <strong id="od-editing-label"></strong></div>
         <input type="text" id="od-search" class="folder-input" placeholder="Ordner suchen..." oninput="onOdSearch()" style="margin-bottom:4px;font-size:11px;padding:4px 6px;">
         <div id="od-search-results" style="display:none;position:fixed;background:white;border:1px solid #ddd;border-radius:4px;max-height:60vh;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         <div id="onedrive-breadcrumb" style="font-size:11px;margin:4px 0;color:#0078d4;cursor:pointer;"></div>
         <div id="onedrive-browser" style="border:1px solid #ddd;border-radius:4px;max-height:168px;overflow-y:auto;background:#fafafa;"></div>
-        <div class="btn-row">
-          <button class="btn btn-primary btn-sm" onclick="confirmOdFolder()">Ordner waehlen</button>
+        <div id="od-new-folder-row" style="display:none;margin-bottom:4px;">
+          <div style="display:flex;gap:4px;">
+            <input type="text" id="od-new-folder-name" class="folder-input" placeholder="Ordnername..." style="flex:1;font-size:11px;padding:4px 6px;">
+            <button class="btn btn-primary btn-sm" onclick="submitNewOneDriveFolder()">Erstellen</button>
+            <button class="btn btn-sm" onclick="document.getElementById('od-new-folder-row').style.display='none'" style="background:#eee;">X</button>
+          </div>
+        </div>
+        <div class="btn-row" style="gap:4px;">
+          <button class="btn btn-primary btn-sm" onclick="confirmOdFolderForAtt()">Ordner waehlen</button>
+          <button class="btn btn-outline btn-sm" onclick="showNewFolderInput()">+ Neuer Ordner</button>
+          <button class="btn btn-sm" onclick="closeOdBrowser()" style="background:#eee;">Abbrechen</button>
         </div>
       </div>
       <div class="btn-row" style="margin-top:4px;">
@@ -297,7 +304,7 @@
       </div>
       <div id="reply-area" style="display:none">
         <div style="font-size:11px;color:#666;margin-bottom:4px;">Antwort-Entwurf:</div>
-        <textarea id="reply-text" class="reply-expandable" placeholder="KI-Antwort erscheint hier..." onclick="expandField(this)" onblur="shrinkField(this)"></textarea>
+        <textarea id="reply-text" class="reply-expandable" placeholder="KI-Antwort erscheint hier..." onclick="expandField(this)" onblur="shrinkField(this)" oninput="markAsChanged()"></textarea>
         <div style="font-size:11px;color:#666;margin-top:6px;margin-bottom:4px;">Anweisung an KI (optional):</div>
         <textarea id="reply-instruction" class="reply-expandable" placeholder="z.B. 'formeller' oder 'frag nach dem Termin'" onclick="expandField(this)" onblur="shrinkField(this)"></textarea>
         <div class="btn-row">
@@ -404,6 +411,7 @@ var state = {
 var outlookFolderMap = {};   // displayName -> folder ID
 var oneDriveFolderMap = {};  // path -> driveItem ID
 var msalInstance = null;
+var msalInteractionInProgress = false;
 var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite', 'Tasks.ReadWrite', 'MailboxSettings.ReadWrite'];
 
 /* ========== MSAL AUTH ========== */
@@ -418,11 +426,15 @@ function initMsal() {
       redirectUri: window.location.origin + '/addin/taskpane.html'
     },
     cache: {
-      cacheLocation: 'localStorage',  // localStorage ueberlebt Add-in Reload!
+      cacheLocation: 'localStorage',
       storeAuthStateInCookie: false
     }
   };
   msalInstance = new msal.PublicClientApplication(msalConfig);
+  // Haengende Interaktionen aufraeumen (z.B. nach abgebrochenem Popup)
+  msalInstance.handleRedirectPromise().catch(function(e) {
+    console.log('MSAL redirect cleanup:', e);
+  });
   return msalInstance;
 }
 
@@ -450,6 +462,10 @@ async function autoConnect() {
 }
 
 async function connectMicrosoft() {
+  if (msalInteractionInProgress) {
+    showToast('Anmeldung laeuft bereits...', 'info');
+    return;
+  }
   try {
     var instance = initMsal();
     // Erst versuchen ob schon ein Account eingeloggt ist
@@ -466,7 +482,9 @@ async function connectMicrosoft() {
       } catch(e) { /* Silent fehlgeschlagen, Popup noetig */ }
     }
     // Popup Login
+    msalInteractionInProgress = true;
     var result = await instance.loginPopup({ scopes: graphScopes });
+    msalInteractionInProgress = false;
     if (result && result.accessToken) {
       state.graphToken = result.accessToken;
     } else if (result && result.account) {
@@ -478,8 +496,15 @@ async function connectMicrosoft() {
     loadOutlookFolders();
     loadOneDriveFolders();
   } catch(e) {
+    msalInteractionInProgress = false;
     console.error('MSAL Fehler:', e);
-    showToast('Anmeldung fehlgeschlagen: ' + e.message, 'error');
+    if (e.errorCode === 'interaction_in_progress') {
+      // Haengende Interaktion automatisch aufraeumen
+      disconnectMicrosoft();
+      showToast('Login-Zustand zurueckgesetzt. Bitte nochmal "Verbinden" klicken.', 'info');
+    } else {
+      showToast('Anmeldung fehlgeschlagen: ' + e.message, 'error');
+    }
   }
 }
 
@@ -496,12 +521,24 @@ async function getGraphToken() {
     return result.accessToken;
   } catch(e) {
     // Token abgelaufen – Popup fuer Erneuerung
+    if (msalInteractionInProgress) {
+      showToast('Anmeldung laeuft bereits, bitte warten...', 'info');
+      return null;
+    }
     try {
+      msalInteractionInProgress = true;
       var result = await msalInstance.acquireTokenPopup({ scopes: graphScopes });
+      msalInteractionInProgress = false;
       state.graphToken = result.accessToken;
       return result.accessToken;
     } catch(e2) {
-      showToast('Token-Erneuerung fehlgeschlagen. Bitte abmelden und neu verbinden.', 'error');
+      msalInteractionInProgress = false;
+      if (e2.errorCode === 'interaction_in_progress') {
+        disconnectMicrosoft();
+        showToast('Login-Zustand zurueckgesetzt. Bitte nochmal "Verbinden" klicken.', 'info');
+      } else {
+        showToast('Token-Erneuerung fehlgeschlagen. Bitte abmelden und neu verbinden.', 'error');
+      }
       updateConnectionUI(false);
       return null;
     }
@@ -937,6 +974,7 @@ function selectFolder(name, id) {
   document.getElementById('folder-suggestions').style.display = 'none';
   state.folder = name;
   state.folderId = id;
+  markAsChanged();
 }
 
 /* ========== LERN-SYSTEM ========== */
@@ -1472,7 +1510,7 @@ function readMailData() {
     for (var i = 0; i < item.attachments.length; i++) {
       var att = item.attachments[i];
       if (!att.isInline) {
-        state.attachments.push({ name: att.name, id: att.id, size: att.size, suggestedName: '', suggestedFolder: '' });
+        state.attachments.push({ name: att.name, id: att.id, size: att.size, suggestedName: '', suggestedFolder: '', folderId: null, folderPath: '' });
       }
     }
   }
@@ -1563,22 +1601,90 @@ function populateFolderDropdown() {
 }
 
 /* ========== ANHAENGE RENDERN ========== */
+var odEditingAttIdx = -1; // Welcher Anhang wird gerade im OneDrive-Browser bearbeitet
+
 function renderAttachments() {
   var list = document.getElementById('att-list');
   list.innerHTML = '';
   state.attachments.forEach(function(att, idx) {
     var div = document.createElement('div');
-    div.className = 'att-item';
+    div.style.cssText = 'margin-bottom:6px;padding:6px 8px;background:#f9f9f9;border-radius:4px;';
+
+    // Zeile 1: Dateiname
     var nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = att.suggestedName || att.name;
     nameInput.id = 'att-name-' + idx;
     nameInput.title = 'Dateiname (editierbar)';
+    nameInput.style.cssText = 'width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:3px;font-size:12px;box-sizing:border-box;';
     div.appendChild(nameInput);
+
+    // Zeile 2: Ordner-Button
+    var folderRow = document.createElement('div');
+    folderRow.style.cssText = 'margin-top:4px;display:flex;gap:4px;align-items:center;';
+
+    var folderBtn = document.createElement('div');
+    folderBtn.id = 'att-folder-' + idx;
+    folderBtn.style.cssText = 'flex:1;padding:3px 6px;background:#e8f0fe;border-radius:3px;font-size:11px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;';
+    var hasFolder = att.folderId || att.folderPath;
+    var folderLabel = att.folderPath || att.suggestedFolder || 'Ordner waehlen...';
+    folderBtn.innerHTML = '<span style="color:' + (hasFolder ? '#107c10' : '#666') + ';">&#128193; ' + folderLabel + '</span><span style="color:#0078d4;font-size:10px;">aendern</span>';
+    folderBtn.onclick = (function(i) { return function() { openOdBrowserForAtt(i); }; })(idx);
+    folderRow.appendChild(folderBtn);
+
+    // X-Button zum Entfernen (nur wenn Ordner zugewiesen)
+    if (hasFolder) {
+      var clearBtn = document.createElement('button');
+      clearBtn.textContent = '\u2715';
+      clearBtn.title = 'Ordner entfernen – Anhang wird nicht hochgeladen';
+      clearBtn.style.cssText = 'background:#eee;border:1px solid #ccc;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 6px;color:#666;';
+      clearBtn.onclick = (function(i) { return function(e) { e.stopPropagation(); clearAttFolder(i); }; })(idx);
+      folderRow.appendChild(clearBtn);
+    }
+
+    div.appendChild(folderRow);
+
     list.appendChild(div);
   });
-  // OneDrive-Browser starten
-  browseOneDrive('root');
+}
+
+function openOdBrowserForAtt(idx) {
+  odEditingAttIdx = idx;
+  var att = state.attachments[idx];
+  var label = document.getElementById('od-editing-label');
+  label.textContent = att.suggestedName || att.name;
+  document.getElementById('onedrive-browser-wrap').style.display = 'block';
+  // Wenn der Anhang schon einen Ordner hat, dorthin navigieren
+  if (att.folderId) {
+    browseOneDrive(att.folderId, att.folderPath.split(' / ').pop());
+  } else {
+    browseOneDrive('root');
+  }
+}
+
+function confirmOdFolderForAtt() {
+  if (odEditingAttIdx < 0 || odEditingAttIdx >= state.attachments.length) return;
+  var pathStr = odCurrentPath.length > 0
+    ? odCurrentPath.map(function(p) { return p.name; }).join(' / ')
+    : 'OneDrive (Root)';
+  state.attachments[odEditingAttIdx].folderId = odSelectedFolderId;
+  state.attachments[odEditingAttIdx].folderPath = pathStr;
+
+  closeOdBrowser();
+  renderAttachments();
+  markAsChanged();
+}
+
+function clearAttFolder(idx) {
+  state.attachments[idx].folderId = null;
+  state.attachments[idx].folderPath = '';
+  renderAttachments();
+  markAsChanged();
+}
+
+function closeOdBrowser() {
+  document.getElementById('onedrive-browser-wrap').style.display = 'none';
+  odEditingAttIdx = -1;
 }
 
 /* ========== ANALYSE-CACHE (localStorage, pro Mail-ID) ========== */
@@ -1859,6 +1965,22 @@ function applyAnalysis(a) {
         if (att.name === suggestion.original || att.name.includes(suggestion.original.split('.')[0])) {
           att.suggestedName = suggestion.vorschlag;
           att.suggestedFolder = suggestion.ordner;
+          // Versuche folderId aus oneDriveFolderMap aufzuloesen
+          if (suggestion.ordner && oneDriveFolderMap[suggestion.ordner]) {
+            att.folderId = oneDriveFolderMap[suggestion.ordner];
+            att.folderPath = suggestion.ordner;
+          } else if (suggestion.ordner) {
+            // Teilname-Suche (z.B. "Eingangsrechnungen" → "EHC / Eingangsrechnungen")
+            var keys = Object.keys(oneDriveFolderMap);
+            for (var ki = 0; ki < keys.length; ki++) {
+              var parts = keys[ki].split(' / ');
+              if (parts[parts.length - 1] === suggestion.ordner && oneDriveFolderMap[keys[ki]]) {
+                att.folderId = oneDriveFolderMap[keys[ki]];
+                att.folderPath = keys[ki];
+                break;
+              }
+            }
+          }
         }
       });
     });
@@ -1883,6 +2005,7 @@ function setAktion(btn) {
   document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   state.aktion = btn.dataset.a;
+  markAsChanged();
   // Ordner automatisch setzen
   var aktionOrdnerMap = {
     'todo_wichtig': '01_ToDo / 02_Wichtig',
@@ -2001,6 +2124,7 @@ function onReplyToggle() {
   state.replyNeeded = on;
   document.getElementById('reply-label').textContent = on ? 'Antwort noetig' : 'Keine Antwort noetig';
   document.getElementById('reply-area').style.display = on ? 'block' : 'none';
+  markAsChanged();
 }
 
 function renderTasks() {
@@ -2134,6 +2258,15 @@ async function getOrCreateTodoList(name) {
 }
 
 /* ========== FEEDBACK ========== */
+// Wird aufgerufen wenn Ole irgendeine Aenderung vornimmt (Aktion, Ordner, Antwort etc.)
+function markAsChanged() {
+  var toggle = document.getElementById('fb-correct-toggle');
+  if (toggle && toggle.checked) {
+    toggle.checked = false;
+    updateFeedbackUI();
+  }
+}
+
 function updateFeedbackUI() {
   var toggle = document.getElementById('fb-correct-toggle');
   var label = document.getElementById('fb-toggle-label');
@@ -2328,7 +2461,7 @@ function onOdSearch() {
             resultsDiv.style.display = 'none';
             browserDiv.style.display = 'block';
             bcDiv.style.display = 'block';
-            confirmOdFolder();
+            confirmOdFolderForAtt();
           };
         })(f, pathParts);
 
@@ -2340,25 +2473,46 @@ function onOdSearch() {
   }, 300);
 }
 
-// Ordner waehlen: Browser einklappen, Auswahl anzeigen
-function confirmOdFolder() {
-  var pathStr = odCurrentPath.length > 0
-    ? odCurrentPath.map(function(p) { return p.name; }).join(' / ')
-    : 'OneDrive (Root)';
-  document.getElementById('onedrive-selected-path').textContent = pathStr;
-  document.getElementById('onedrive-selected').style.display = 'block';
-  document.getElementById('onedrive-browser-wrap').style.display = 'none';
+// Neuen Unterordner im aktuellen OneDrive-Ordner erstellen
+function showNewFolderInput() {
+  var row = document.getElementById('od-new-folder-row');
+  row.style.display = 'block';
+  var input = document.getElementById('od-new-folder-name');
+  input.value = '';
+  input.focus();
 }
 
-// Browser wieder aufklappen
-function toggleOdBrowser() {
-  var wrap = document.getElementById('onedrive-browser-wrap');
-  var sel = document.getElementById('onedrive-selected');
-  if (wrap.style.display === 'none') {
-    wrap.style.display = 'block';
-    sel.style.display = 'none';
-  } else {
-    confirmOdFolder();
+async function submitNewOneDriveFolder() {
+  var input = document.getElementById('od-new-folder-name');
+  var name = input.value.trim();
+  if (!name) { showToast('Bitte Ordnernamen eingeben', 'info'); return; }
+
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+
+  var parentId = odCurrentFolderId || 'root';
+  var url = parentId === 'root'
+    ? 'https://graph.microsoft.com/v1.0/me/drive/root/children'
+    : 'https://graph.microsoft.com/v1.0/me/drive/items/' + parentId + '/children';
+
+  try {
+    showToast('Ordner "' + name + '" wird erstellt...', 'info');
+    var res = await graphFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' })
+    });
+    if (res && res.ok) {
+      var newFolder = await res.json();
+      showToast('Ordner "' + name + '" erstellt', 'success');
+      document.getElementById('od-new-folder-row').style.display = 'none';
+      // In den neuen Ordner navigieren
+      browseOneDrive(newFolder.id, newFolder.name);
+    } else {
+      var err = res ? await res.json().catch(function() { return {}; }) : {};
+      showToast('Fehler: ' + (err.error ? err.error.message : 'Ordner konnte nicht erstellt werden'), 'error');
+    }
+  } catch(e) {
+    showToast('Fehler: ' + e.message, 'error');
   }
 }
 
@@ -2456,6 +2610,7 @@ function setReplyMode(btn) {
   document.querySelectorAll('#reply-mode-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   state.replyMode = btn.dataset.rm;
+  markAsChanged();
 }
 
 // Antwort in Outlook oeffnen (native Reply-Funktion, nie automatisch senden)
@@ -2482,8 +2637,14 @@ async function openReplyInOutlook(mode) {
     item.displayReplyForm({ htmlBody: htmlBody });
     showToast('Antwort in Outlook geoeffnet', 'success');
   } else if (mode === 'replyAll') {
-    item.displayReplyAllForm({ htmlBody: htmlBody });
-    showToast('Antwort (alle) in Outlook geoeffnet', 'success');
+    console.log('[Reply] displayReplyAllForm aufgerufen, htmlBody laenge:', htmlBody.length);
+    try {
+      item.displayReplyAllForm({ htmlBody: htmlBody });
+      showToast('Antwort (alle) in Outlook geoeffnet', 'success');
+    } catch(replyErr) {
+      console.error('[Reply] displayReplyAllForm Fehler:', replyErr);
+      showToast('Antwort konnte nicht geoeffnet werden: ' + replyErr.message, 'error');
+    }
   } else if (mode === 'forward') {
     // Forward ueber Graph API erstellen (Office.js hat kein displayForwardForm)
     if (state.graphToken && state.restMailId) {
@@ -2779,35 +2940,26 @@ async function uploadAllAttachments() {
   if (!state.restMailId) { showToast('Keine Mail ausgewaehlt', 'error'); return; }
   if (state.attachments.length === 0) { showToast('Keine Anhaenge vorhanden', 'info'); return; }
 
-  // Ziel-Ordner pruefen
-  var folderId = odSelectedFolderId && odSelectedFolderId !== 'root' ? odSelectedFolderId : null;
-  var folderInfo = folderId ? ('Ordner-ID: ' + folderId.substring(0, 20) + '...') : 'OneDrive Root (kein Ordner gewaehlt!)';
-  console.log('Upload-Start: ' + state.attachments.length + ' Anhaenge, Ziel: ' + folderInfo);
-
-  if (!folderId) {
-    showToast('Bitte erst einen OneDrive-Ordner auswaehlen', 'error');
-    return;
-  }
+  // Nur Anhaenge mit zugewiesenem Ordner hochladen, Rest ueberspringen
+  var mitOrdner = state.attachments.filter(function(a) { return a.folderId; });
+  if (mitOrdner.length === 0) { return; }
 
   // Alle Anhaenge von Graph laden
   showToast('Anhaenge werden geladen...', 'info');
-  console.log('Lade Anhaenge von Mail: ' + state.restMailId.substring(0, 30) + '...');
   var attRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/attachments');
   if (!attRes || !attRes.ok) {
     var errStatus = attRes ? attRes.status : 'null';
-    console.error('Anhaenge laden fehlgeschlagen, Status:', errStatus);
-    if (attRes) { try { var errBody = await attRes.text(); console.error('Response:', errBody.substring(0, 500)); } catch(e) {} }
     showToast('Anhaenge konnten nicht geladen werden (HTTP ' + errStatus + ')', 'error');
     return;
   }
   var attData = await attRes.json();
   var graphAttachments = attData.value || [];
-  console.log(graphAttachments.length + ' Anhaenge von Graph geladen, davon mit contentBytes: ' +
-    graphAttachments.filter(function(a) { return a.contentBytes; }).length);
 
   var erfolg = 0, fehler = 0;
   for (var idx = 0; idx < state.attachments.length; idx++) {
     var att = state.attachments[idx];
+    var folderId = att.folderId;
+    if (!folderId) continue; // Kein Ordner zugewiesen → ueberspringen
     var filename = document.getElementById('att-name-' + idx) ? document.getElementById('att-name-' + idx).value.trim() : att.name;
 
     if (!filename) { fehler++; continue; }
@@ -2815,20 +2967,16 @@ async function uploadAllAttachments() {
     // Passenden Graph-Anhang finden (nach Name)
     var graphAtt = graphAttachments.find(function(ga) { return ga.name === att.name; }) || graphAttachments[idx];
     if (!graphAtt) {
-      console.error('Kein Graph-Anhang fuer "' + att.name + '" gefunden. Verfuegbar:', graphAttachments.map(function(a) { return a.name; }));
       showToast('Anhang "' + att.name + '" nicht in Graph gefunden', 'error');
       fehler++;
       continue;
     }
     if (!graphAtt.contentBytes) {
-      console.error('Anhang "' + att.name + '" hat keine contentBytes. Typ: ' + graphAtt['@odata.type'] + ', Groesse: ' + graphAtt.size);
       // Fallback: Einzeln laden mit contentBytes
-      console.log('Versuche Einzelabruf fuer Anhang ID: ' + graphAtt.id);
       try {
         var singleRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId + '/attachments/' + graphAtt.id);
         if (singleRes && singleRes.ok) {
           graphAtt = await singleRes.json();
-          console.log('Einzelabruf: contentBytes vorhanden: ' + !!graphAtt.contentBytes);
         }
       } catch(e) { console.error('Einzelabruf fehlgeschlagen:', e); }
 
@@ -2844,11 +2992,9 @@ async function uploadAllAttachments() {
     var bytes = new Uint8Array(binary.length);
     for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     var blob = new Blob([bytes], { type: graphAtt.contentType || 'application/octet-stream' });
-    console.log('Blob erstellt: ' + filename + ', Groesse: ' + blob.size + ' Bytes');
 
-    // Upload URL
+    // Upload URL – individueller Ordner pro Anhang
     var uploadUrl = 'https://graph.microsoft.com/v1.0/me/drive/items/' + folderId + ':/' + encodeURIComponent(filename) + ':/content';
-    console.log('Upload URL: ' + uploadUrl);
 
     try {
       showToast('Lade "' + filename + '" hoch...', 'info');
@@ -2863,26 +3009,20 @@ async function uploadAllAttachments() {
         body: blob
       });
       if (upRes && upRes.ok) {
-        var upData = await upRes.json();
-        console.log('Upload erfolgreich: ' + upData.name + ' -> ' + upData.webUrl);
         erfolg++;
+        // Lern-System: Absender → OneDrive-Pfad merken
+        if (att.folderPath) learnAttachmentFolder(state.fromEmail, att.folderPath);
       } else {
-        var errText = upRes ? await upRes.text() : 'null';
-        console.error('Upload Fehler ' + (upRes ? upRes.status : 'null') + ':', errText.substring(0, 500));
         showToast('Upload "' + filename + '" fehlgeschlagen: HTTP ' + (upRes ? upRes.status : 'null'), 'error');
         fehler++;
       }
     } catch(e) {
-      console.error('Upload Exception:', e);
       showToast('Upload "' + filename + '" fehlgeschlagen: ' + e.message, 'error');
       fehler++;
     }
   }
   if (fehler === 0) {
     showToast(erfolg + ' Anhang/Anhaenge in OneDrive abgelegt', 'success');
-    // Lern-System: Absender → OneDrive-Pfad merken
-    var pathStr = odCurrentPath.map(function(p) { return p.name; }).join(' / ');
-    if (pathStr) learnAttachmentFolder(state.fromEmail, pathStr);
   } else {
     showToast(erfolg + ' hochgeladen, ' + fehler + ' fehlgeschlagen', 'error');
   }
@@ -2940,10 +3080,10 @@ async function executeAll() {
   }
 
   // 3. Antwort in Outlook oeffnen (VOR Mail-Verschiebung – braucht item-Referenz)
-  // Antwort oeffnen wenn Text vorhanden – egal ob Toggle an oder aus
-  // (Toggle steuert nur ob KI einen Entwurf generiert, nicht ob vorhandener Text geoeffnet wird)
+  var replyToggleOn = document.getElementById('reply-toggle').checked;
   var replyText = document.getElementById('reply-text').value.trim();
-  if (replyText) {
+  console.log('[executeAll] Reply-Toggle:', replyToggleOn, 'Reply-Text laenge:', replyText.length, 'replyMode:', state.replyMode);
+  if (replyToggleOn && replyText) {
     steps.push('Antwort oeffnen');
     try { await openReplyInOutlook(); } catch(e) { errors.push('Antwort: ' + e.message); }
   }
