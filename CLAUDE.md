@@ -1,8 +1,9 @@
 # CLAUDE.md – KI Mail Assistent (Tool-spezifisch)
 
-Lies ZUERST die CLAUDE.md im ehc-shared Repo fuer die allgemeinen Arbeitsregeln.
-Pfad: Siehe shared-path.config in diesem Repo.
-Lies danach diese Datei fuer Mail-Assistent-spezifische Regeln.
+Lies ZUERST die shared-path.config in diesem Repo – der Pfad dort zeigt auf das ehc-shared Repo.
+Lies dort CLAUDE.md (KOMPLETT – enthaelt kritische Arbeitsregeln zu Feedback, Dokumentation, Git).
+Lies dort KONZEPT.md und PROJEKTSTAND.md fuer den Gesamtkontext.
+Lies DANACH diese Datei fuer Mail-Assistent-spezifische Regeln.
 
 ## Was dieses Projekt ist
 Ein Outlook Add-in das als Seitenleiste in Outlook laeuft und Ole hilft, seine E-Mails schneller abzuarbeiten.
