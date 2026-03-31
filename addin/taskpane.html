@@ -312,28 +312,13 @@
   </div>
 
   <!-- Tasks -->
-  <div class="section collapsed" id="sec-tasks">
-    <div class="section-head" onclick="toggleSection('sec-tasks')">Als Aufgabe anlegen <span class="arrow">▼</span></div>
-    <div class="section-body">
-      <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px">Titel</label>
-      <input type="text" id="task-title" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;margin-bottom:8px" placeholder="Aufgabentitel...">
-      <div style="display:flex;gap:6px;margin-bottom:8px">
-        <div style="flex:1">
-          <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px">Liste</label>
-          <select id="task-list-select" style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box"></select>
-        </div>
-        <div style="flex:1">
-          <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px">F&auml;llig</label>
-          <input type="date" id="task-due-date" style="width:100%;padding:4px 5px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box">
-        </div>
-      </div>
-      <div id="task-importance-row" style="display:flex;gap:4px;margin-bottom:8px">
-        <button onclick="setTaskImportance('high',this)" style="flex:1;padding:5px;font-size:11px;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#f5f5f5">&#8679; Hoch</button>
-        <button onclick="setTaskImportance('normal',this)" style="flex:1;padding:5px;font-size:11px;border:1px solid #0078d4;border-radius:4px;cursor:pointer;background:#e3f2fd;color:#0078d4;font-weight:600">Normal</button>
-        <button onclick="setTaskImportance('low',this)" style="flex:1;padding:5px;font-size:11px;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#f5f5f5">&#8681; Niedrig</button>
-      </div>
-      <button class="btn btn-primary" style="width:100%;padding:8px" onclick="createTaskFromEmail()">E-Mail flaggen &amp; Aufgabe erstellen</button>
-    </div>
+  <!-- Als Aufgabe anlegen -->
+  <div class="reply-toggle" style="padding:8px 12px;border-bottom:1px solid #eee;">
+    <label class="toggle">
+      <input type="checkbox" id="task-toggle" onchange="onTaskToggle()">
+      <span class="toggle-slider"></span>
+    </label>
+    <span id="task-toggle-label" style="font-size:12px;color:#666;">Als Aufgabe anlegen (flaggen)</span>
   </div>
 
   <!-- Feedback -->
@@ -615,8 +600,6 @@ function updateConnectionUI(connected) {
   if (connected) {
     dot.className = 'conn-dot connected';
     btn.innerHTML = '<span class="conn-dot connected" id="conn-dot"></span>Verbunden';
-    if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
-    populateTaskLists();
   } else {
     dot.className = 'conn-dot disconnected';
     btn.innerHTML = '<span class="conn-dot disconnected" id="conn-dot"></span>Verbinden';
@@ -1343,154 +1326,23 @@ var DEFAULT_TENANT_IDS = {
   'ole.reinpold@qodia.de': '90717f4c-db25-409e-b8ba-d69096033986'
 };
 
-var TODO_LISTS = {
-  'o.reinpold@hernie.de':  ['Aktive To-Dos', 'Regelmäßige To-Dos', 'Nachhalten', 'Website', 'Gedankenspeicher'],
-  'ole.reinpold@qodia.de': ["Aktive To-Do's", "Regelmäßige To-Do's", 'Nachhalten', 'Gedankenspeicher']
-};
-var taskImportance = 'normal';
-var cachedTodoLists = null; // Cache für To-Do-Listen nach erfolgreichem API-Aufruf
+/* ========== ALS AUFGABE ANLEGEN (nur Flaggen) ========== */
+function onTaskToggle() {
+  var on = document.getElementById('task-toggle').checked;
+  var lbl = document.getElementById('task-toggle-label');
+  lbl.style.color = on ? '#107c10' : '#666';
+  lbl.style.fontWeight = on ? '600' : 'normal';
+}
 
-function populateTaskListsFallback(sel) {
-  var fallback = TODO_LISTS[accountKey] || TODO_LISTS['o.reinpold@hernie.de'];
-  sel.innerHTML = '';
-  fallback.forEach(function(name) {
-    var opt = document.createElement('option');
-    opt.value = name; // Name als value – createTaskFromEmail erkennt das
-    opt.textContent = name;
-    sel.appendChild(opt);
+async function flagMailAsTask() {
+  if (!state.restMailId) return false;
+  var res = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId, {
+    method: 'PATCH',
+    body: JSON.stringify({ flag: { flagStatus: 'flagged' } })
   });
+  return !!(res && res.ok);
 }
 
-async function populateTaskLists() {
-  var sel = document.getElementById('task-list-select');
-  if (!sel) return;
-  if (!state.graphToken) {
-    populateTaskListsFallback(sel);
-    return;
-  }
-  sel.innerHTML = '<option value="">Laden...</option>';
-  try {
-    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
-    if (res && res.ok) {
-      var data = await res.json();
-      var lists = (data.value || []).filter(function(l) {
-        return l.displayName !== 'Flagged Email' && l.displayName !== 'Gekennzeichnete E-Mails';
-      });
-      if (lists.length > 0) {
-        cachedTodoLists = lists; // Cache fuer createTaskFromEmail
-        sel.innerHTML = '';
-        lists.forEach(function(l) {
-          var opt = document.createElement('option');
-          opt.value = l.id;
-          opt.textContent = l.displayName;
-          sel.appendChild(opt);
-        });
-        return;
-      }
-    } else {
-      var errSt = res ? res.status : 0;
-      var errTxt = '';
-      try { var d = await res.json(); errTxt = d.error ? d.error.message : ''; } catch(e2) {}
-      console.warn('To-Do Listen API Fehler', errSt, errTxt);
-    }
-  } catch(e) {
-    console.warn('To-Do Listen API fehlgeschlagen:', e);
-  }
-  // Fallback: hardcodierte Namen
-  populateTaskListsFallback(sel);
-}
-
-function setTaskImportance(level, btn) {
-  taskImportance = level;
-  var row = document.getElementById('task-importance-row');
-  row.querySelectorAll('button').forEach(function(b) {
-    b.style.border = '1px solid #ddd';
-    b.style.background = '#f5f5f5';
-    b.style.color = '';
-    b.style.fontWeight = '';
-  });
-  btn.style.border = '1px solid #0078d4';
-  btn.style.background = '#e3f2fd';
-  btn.style.color = '#0078d4';
-  btn.style.fontWeight = '600';
-}
-
-async function getTodoListId(name) {
-  try {
-    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
-    if (!res || !res.ok) return null;
-    var data = await res.json();
-    var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a]/g, '').replace(/\s+/g, ' ').trim(); };
-    var normName = normalize(name);
-    var found = (data.value || []).find(function(l) { return normalize(l.displayName) === normName; });
-    return found ? found.id : null;
-  } catch(e) { return null; }
-}
-
-async function createTaskFromEmail() {
-  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
-  var title = document.getElementById('task-title').value.trim();
-  if (!title) { showToast('Bitte Titel eingeben', 'info'); return; }
-  var sel = document.getElementById('task-list-select');
-  var listName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : sel.value;
-  var listIdFromSel = sel.value;
-  var dueDate = document.getElementById('task-due-date').value;
-  if (!listIdFromSel) { showToast('Bitte eine Liste auswählen', 'info'); return; }
-
-  // 1. E-Mail ZUERST flaggen (unabhaengig vom Listen-Lookup)
-  var flagged = false;
-  if (state.restMailId) {
-    var flagRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId, {
-      method: 'PATCH',
-      body: JSON.stringify({ flag: { flagStatus: 'flagged' } })
-    });
-    flagged = !!(flagRes && flagRes.ok);
-  }
-
-  var flagPrefix = flagged ? 'E-Mail markiert. ' : '';
-
-  // 2. Listen-ID aus Cache oder per API holen
-  var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a\u00b4`]/g, '').replace(/\s+/g, ' ').trim(); };
-  var allLists = cachedTodoLists;
-  if (!allLists) {
-    // Kein Cache – einmal laden und cachen
-    var listsRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
-    if (!listsRes || !listsRes.ok) {
-      var st = listsRes ? listsRes.status : 0;
-      var apiErrTxt = '';
-      try { var d = await listsRes.json(); apiErrTxt = d.error ? ': ' + d.error.message : ''; } catch(e2) {}
-      showToast(flagPrefix + 'To-Do API Fehler ' + st + apiErrTxt, 'error');
-      return;
-    }
-    var listsData = await listsRes.json();
-    allLists = (listsData.value || []);
-    cachedTodoLists = allLists;
-    // Dropdown mit echten IDs nachfuellen
-    populateTaskLists();
-  }
-  var found = allLists.find(function(l) { return l.id === listIdFromSel; })
-    || allLists.find(function(l) { return normalize(l.displayName) === normalize(listName); });
-  if (!found) {
-    var available = allLists.map(function(l) { return l.displayName; }).join(', ');
-    showToast(flagPrefix + 'Liste "' + listName + '" nicht gefunden. Verfuegbar: ' + available, 'error');
-    return;
-  }
-
-  // 3. Aufgabe erstellen (minimal – kein body-Feld wegen 400-Risiko)
-  var taskBody = { title: title };
-  if (dueDate) taskBody.dueDateTime = { dateTime: dueDate + 'T00:00:00.0000000', timeZone: 'UTC' };
-  var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists/' + found.id + '/tasks', {
-    method: 'POST',
-    body: JSON.stringify(taskBody)
-  });
-  if (res && res.ok) {
-    showToast((flagged ? 'E-Mail markiert & ' : '') + 'Aufgabe "' + title + '" in "' + found.displayName + '" erstellt', 'success');
-  } else {
-    var errSt = res ? res.status : 0;
-    var errMsg = '';
-    try { var errData = await res.json(); errMsg = errData.error ? errData.error.message : ''; } catch(e2) {}
-    showToast(flagPrefix + 'Fehler ' + errSt + (errMsg ? ': ' + errMsg : ''), 'error');
-  }
 }
 
 function loadConfig() {
@@ -1668,10 +1520,6 @@ function resetUIForNewMail() {
   state.tasks = [];
   // Spinner zuruecksetzen
   document.getElementById('analyze-spinner').style.display = 'none';
-  // Aufgaben-Felder leeren
-  var tt = document.getElementById('task-title');
-  if (tt) tt.value = '';
-  var dd = document.getElementById('task-due-date');
   if (dd) dd.value = '';
   document.getElementById('folder-input').value = '';
   state.folderId = null;
@@ -1767,17 +1615,12 @@ function onMailLoaded() {
   populateFolderDropdown();
 
   // Aufgaben-Bereich vorbereiten
-  document.getElementById('task-title').value = state.subject || '';
-  document.getElementById('task-due-date').value = '';
-  taskImportance = 'normal';
-  var impRow = document.getElementById('task-importance-row');
+  // task-importance-row entfernt
   if (impRow) impRow.querySelectorAll('button').forEach(function(b, i) {
     b.style.border = i === 1 ? '1px solid #0078d4' : '1px solid #ddd';
     b.style.background = i === 1 ? '#e3f2fd' : '#f5f5f5';
     b.style.color = i === 1 ? '#0078d4' : '';
     b.style.fontWeight = i === 1 ? '600' : '';
-  });
-  populateTaskLists();
 
   // Anhaenge anzeigen
   if (state.attachments.length > 0) {
@@ -2199,9 +2042,6 @@ function applyAnalysis(a) {
   }
 
   // Aufgaben: KI-Vorschlag als Titel vorausfuellen (erste Aufgabe)
-  if (a.aufgaben && a.aufgaben.length > 0) {
-    var taskTitleEl = document.getElementById('task-title');
-    if (taskTitleEl && !taskTitleEl.value) taskTitleEl.value = a.aufgaben[0];
   }
 
   // Anhaenge
@@ -2372,7 +2212,6 @@ function onReplyToggle() {
   markAsChanged();
 }
 
-/* ========== MICROSOFT TO DO – ersetzt durch createTaskFromEmail() ========== */
 
 /* ========== FEEDBACK ========== */
 // Wird aufgerufen wenn Ole irgendeine Aenderung vornimmt (Aktion, Ordner, Antwort etc.)
@@ -3190,7 +3029,14 @@ async function executeAll() {
     try { await uploadAllAttachments(); } catch(e) { errors.push('Upload: ' + e.message); }
   }
 
-  // 2. Aufgaben: werden jetzt manuell per "Als Aufgabe anlegen" erstellt
+  // 2. Mail flaggen wenn Toggle gesetzt
+  if (document.getElementById('task-toggle').checked) {
+    steps.push('Mail flaggen');
+    try {
+      var flagged = await flagMailAsTask();
+      if (!flagged) errors.push('Flaggen fehlgeschlagen');
+    } catch(e) { errors.push('Flaggen: ' + e.message); }
+  }
 
   // 3. Antwort in Outlook oeffnen (VOR Mail-Verschiebung – braucht item-Referenz)
   var replyToggleOn = document.getElementById('reply-toggle').checked;
