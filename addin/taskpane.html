@@ -1612,14 +1612,6 @@ function onMailLoaded() {
   // Ordner-Dropdown befuellen
   populateFolderDropdown();
 
-  // Aufgaben-Bereich vorbereiten
-  // task-importance-row entfernt
-  if (impRow) impRow.querySelectorAll('button').forEach(function(b, i) {
-    b.style.border = i === 1 ? '1px solid #0078d4' : '1px solid #ddd';
-    b.style.background = i === 1 ? '#e3f2fd' : '#f5f5f5';
-    b.style.color = i === 1 ? '#0078d4' : '';
-    b.style.fontWeight = i === 1 ? '600' : '';
-
   // Anhaenge anzeigen
   if (state.attachments.length > 0) {
     document.getElementById('sec-attachments').style.display = 'block';
@@ -2037,9 +2029,6 @@ function applyAnalysis(a) {
   if (a.antwort_entwurf) {
     state.replyText = a.antwort_entwurf;
     document.getElementById('reply-text').value = a.antwort_entwurf;
-  }
-
-  // Aufgaben: KI-Vorschlag als Titel vorausfuellen (erste Aufgabe)
   }
 
   // Anhaenge
