@@ -3,6 +3,7 @@ import ssl
 import os
 import sys
 import json
+import socket
 from datetime import datetime
 
 PORT = 3000
@@ -101,8 +102,11 @@ class GedaechtnisHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def end_headers(self):
-        """CORS-Header bei jeder Antwort."""
+        """CORS-Header + No-Cache bei jeder Antwort (verhindert Caching im Desktop-Outlook)."""
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
         super().end_headers()
 
     def log_message(self, format, *args):
@@ -110,7 +114,25 @@ class GedaechtnisHandler(http.server.SimpleHTTPRequestHandler):
         if 'POST' in str(args) or 'ERROR' in str(args):
             super().log_message(format, *args)
 
-httpd = http.server.HTTPServer(('localhost', PORT), GedaechtnisHandler)
+# Dual-Stack Server: empfaengt sowohl IPv4 (127.0.0.1) als auch IPv6 (::1)
+# Noetig weil OAuth-Popup-Fenster 'localhost' manchmal als ::1 aufloesung
+class DualStackServer(http.server.HTTPServer):
+    def server_bind(self):
+        if hasattr(socket, 'AF_INET6') and hasattr(socket, 'IPV6_V6ONLY'):
+            try:
+                self.socket.close()
+                self.socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+                self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            except Exception:
+                pass  # Fallback: normaler IPv4-Socket
+        super().server_bind()
+
+try:
+    httpd = DualStackServer(('::', PORT), GedaechtnisHandler)
+except OSError:
+    # Fallback falls :: nicht verfuegbar
+    httpd = http.server.HTTPServer(('0.0.0.0', PORT), GedaechtnisHandler)
 
 ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ctx.load_cert_chain(CERT_FILE, KEY_FILE)

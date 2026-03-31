@@ -75,6 +75,7 @@ Es nutzt ein geteiltes "Gedaechtnis" (Textdateien in ehc-shared/gedaechtnis/) da
 - Folder-ID wird per Rueckwaerts-Suche gefunden (Ordner muss mind. 1 Mail enthalten)
 - Breite der Seitenleiste im neuen Outlook nicht aenderbar
 - OneDrive-Ordner per Graph API funktionieren OHNE Bug
+- qodia.de Add-in liegt unter "Weitere Apps" statt direkt im Ribbon (Microsoft-Bug)
 
 ## Entschiedene Punkte – nicht nochmal diskutieren
 - Outlook Add-in statt Web-App: ENTSCHIEDEN (25.03.2026)
@@ -83,3 +84,35 @@ Es nutzt ein geteiltes "Gedaechtnis" (Textdateien in ehc-shared/gedaechtnis/) da
 - Claude API Key im localStorage: akzeptiertes Risiko
 - Microsoft To Do fuer Aufgaben: ENTSCHIEDEN (parallel zu E-Mail-Ordner-System)
 - Antworten NIE automatisch senden: IMMER nur in Outlook oeffnen
+- Aktion-Sektion: ENTFERNT (31.03.2026) – war redundant
+
+## Kritische Implementierungs-Regeln (gelernt aus Fehlern)
+
+### MSAL / Auth
+- `getGraphToken()` darf KEINEN `acquireTokenPopup()` Fallback haben
+  → fuehrt zu unerwarteten Popups bei jedem Token-Ablauf
+  → Token-Fehler = silent fail, `state.graphToken = null`, UI zeigt "Verbinden"
+  → Popup NUR bei manuellem Klick auf "Verbinden" (in `connectMicrosoft()`)
+- `autoConnect()` nur `acquireTokenSilent`, kein `ssoSilent`, kein Popup
+- `clearStaleMsalState()` in `initMsal()` aufrufen – bereinigt haengende
+  'interaction.status' Keys in sessionStorage
+
+### To-Do / Tasks
+- Microsoft erstellt automatisch Task in "Gekennzeichnete E-Mails" wenn Mail geflagged –
+  das ist System-Verhalten, KEIN Code-Bug. Eigene Tasks landen separat.
+- `dueDateTime` Format: `{ dateTime: "YYYY-MM-DDT00:00:00.0000000", timeZone: "UTC" }`
+  (7 Dezimalstellen, UTC – nicht Europe/Berlin)
+- Listen-Namen koennen Apostroph-Varianten haben (' vs \u2019) → immer fuzzy matchen
+- `populateTaskLists()` MUSS in `updateConnectionUI(true)` aufgerufen werden,
+  NICHT in `onMailLoaded()` – zu dem Zeitpunkt ist der Token noch null
+- `showToast()` nie zweimal schnell hintereinander aufrufen – 2. ueberschreibt 1. sofort
+
+### manifest.xml
+- `MinVersion` im aeusseren `<Requirements>` muss 1.5 sein (nicht 1.13)
+  → 1.13 verhindert Add-in bei aelteren E-Mails und To-Do-E-Mails
+
+### Per-Account Settings
+- Alle localStorage-Zugriffe ueber `lsGet(key)` / `lsSet(key, val)` – die fuegen
+  automatisch den `accountKey` als Prefix hinzu (`o.reinpold@hernie.de_ki_*`)
+- Beim ersten Start laeuft `migrateOldSettings()` einmalig (Flag `ki_settings_migrated_v2`)
+- Account-Konstanten: `DEFAULT_CLIENT_IDS`, `DEFAULT_TENANT_IDS`, `TODO_LISTS` (je Account)

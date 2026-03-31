@@ -79,7 +79,12 @@
     textarea.reply-expandable.field-expanded { min-height: 45vh; max-height: 60vh; }
 
     /* Tasks */
-    #task-importance-row .prio-btn { padding: 4px 8px; }
+    .task-item { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+    .task-item input[type=checkbox] { margin-top: 2px; }
+    .task-text { flex: 1; font-size: 12px; line-height: 1.4; }
+    .task-text.done { text-decoration: line-through; color: #999; }
+    .add-task { display: flex; gap: 4px; margin-top: 6px; }
+    .add-task input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
 
     /* Buttons */
     .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; }
@@ -184,6 +189,11 @@
   <div class="analyze-bar" id="analyze-bar">
     <button class="btn btn-primary" id="btn-analyze-top" onclick="startAnalysis(false)">Jetzt analysieren</button>
     <button class="btn btn-outline btn-sm" id="btn-reanalyze-top" onclick="startAnalysis(true)" style="display:none">Neu</button>
+    <div id="analyze-spinner" style="display:none;align-items:center;gap:6px;font-size:12px;color:#0078d4;flex:1">
+      <div class="spinner"></div><span>Analysiere...</span>
+    </div>
+    <span class="mail-info" id="analyze-mail-info"></span>
+    <span class="status-dot new" id="analyze-dot"></span>
   </div>
   <!-- Sperren-Leiste (Absender oder Domain, je ein Klick) -->
   <div style="margin:0 8px 4px;display:flex;gap:4px;">
@@ -191,27 +201,10 @@
     <button id="qb-domain-btn" onclick="executeQuickBlock('domain')" style="flex:1;background:#b71c1c;color:white;border:none;padding:5px 6px;font-size:11px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sperren: Domain</button>
   </div>
 
-  <!-- Aktion (was soll mit der Mail passieren) -->
-  <div class="section" id="sec-aktion">
-    <div class="section-head" onclick="toggleSection('sec-aktion')">Aktion <span class="arrow">▼</span></div>
-    <div class="section-body">
-      <div class="prio-row" id="aktion-row">
-        <button class="prio-btn" data-a="sofort" onclick="setAktion(this)">Sofort</button>
-        <button class="prio-btn" data-a="erledigen" onclick="setAktion(this)">Erledigen</button>
-        <button class="prio-btn" data-a="todo_wichtig" onclick="setAktion(this)">ToDo Wichtig</button>
-        <button class="prio-btn" data-a="todo_nth" onclick="setAktion(this)">ToDo NTH</button>
-        <button class="prio-btn" data-a="nachhalten" onclick="setAktion(this)">Nachhalten</button>
-        <button class="prio-btn" data-a="ablage" onclick="setAktion(this)">Ablage</button>
-        <button class="prio-btn" data-a="loeschen" onclick="setAktion(this)">Loeschen</button>
-      </div>
-      <div id="block-sender-area" style="display:none;margin-top:8px;padding:8px;background:#fff3cd;border-radius:4px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
-          <input type="checkbox" id="block-sender-toggle" onchange="onBlockToggle()">
-          Domain <strong id="block-domain"></strong> kuenftig sperren
-        </label>
-      </div>
-    </div>
-  </div>
+  <!-- Aktion (entfernt – KI setzt state.aktion intern, kein manuelles UI) -->
+  <div id="block-sender-area" style="display:none"></div>
+  <input type="checkbox" id="block-sender-toggle" style="display:none" onchange="onBlockToggle()">
+  <strong id="block-domain" style="display:none"></strong>
 
   <!-- Analysis (collapsed by default) -->
   <div class="section collapsed" id="sec-analysis">
@@ -320,26 +313,26 @@
 
   <!-- Tasks -->
   <div class="section collapsed" id="sec-tasks">
-    <div class="section-head" onclick="toggleSection('sec-tasks')">Als Aufgabe anlegen <span class="arrow">&#9660;</span></div>
+    <div class="section-head" onclick="toggleSection('sec-tasks')">Als Aufgabe anlegen <span class="arrow">▼</span></div>
     <div class="section-body">
-      <label style="font-size:11px;color:#666;margin-bottom:2px;display:block;">Titel</label>
-      <input type="text" id="task-title" placeholder="Aufgabentitel..." style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;margin-bottom:6px;">
-      <div style="display:flex;gap:6px;margin-bottom:6px;">
+      <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px">Titel</label>
+      <input type="text" id="task-title" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;margin-bottom:8px" placeholder="Aufgabentitel...">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
         <div style="flex:1">
-          <label style="font-size:11px;color:#666;margin-bottom:2px;display:block;">Liste</label>
-          <select id="task-list-select" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></select>
+          <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px">Liste</label>
+          <select id="task-list-select" style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box"></select>
         </div>
         <div style="flex:1">
-          <label style="font-size:11px;color:#666;margin-bottom:2px;display:block;">Faellig</label>
-          <input type="date" id="task-due-date" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;">
+          <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px">F&auml;llig</label>
+          <input type="date" id="task-due-date" style="width:100%;padding:4px 5px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box">
         </div>
       </div>
-      <div id="task-importance-row" style="display:flex;gap:4px;margin-bottom:8px;">
-        <button class="prio-btn" onclick="setTaskImportance('high',this)" style="flex:1;font-size:11px;">&#11014; Hoch</button>
-        <button class="prio-btn active" onclick="setTaskImportance('normal',this)" style="flex:1;font-size:11px;">Normal</button>
-        <button class="prio-btn" onclick="setTaskImportance('low',this)" style="flex:1;font-size:11px;">&#11015; Niedrig</button>
+      <div id="task-importance-row" style="display:flex;gap:4px;margin-bottom:8px">
+        <button onclick="setTaskImportance('high',this)" style="flex:1;padding:5px;font-size:11px;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#f5f5f5">&#8679; Hoch</button>
+        <button onclick="setTaskImportance('normal',this)" style="flex:1;padding:5px;font-size:11px;border:1px solid #0078d4;border-radius:4px;cursor:pointer;background:#e3f2fd;color:#0078d4;font-weight:600">Normal</button>
+        <button onclick="setTaskImportance('low',this)" style="flex:1;padding:5px;font-size:11px;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#f5f5f5">&#8681; Niedrig</button>
       </div>
-      <button class="btn btn-primary btn-sm" style="width:100%" onclick="createTaskFromEmail()">E-Mail flaggen &amp; Aufgabe erstellen</button>
+      <button class="btn btn-primary" style="width:100%;padding:8px" onclick="createTaskFromEmail()">E-Mail flaggen &amp; Aufgabe erstellen</button>
     </div>
   </div>
 
@@ -373,12 +366,17 @@
 <div class="config-overlay" id="config-overlay" onclick="toggleConfig()"></div>
 <div class="config-panel" id="config-panel">
   <h2>Einstellungen</h2>
+  <label style="font-weight:700;color:#0078d4;">Aktives Konto</label>
+  <select id="cfg-account-select" style="margin-bottom:12px;font-weight:600;" onchange="switchAccount(this.value)">
+    <option value="o.reinpold@hernie.de">o.reinpold@hernie.de (EHC)</option>
+    <option value="ole.reinpold@qodia.de">ole.reinpold@qodia.de (Qodia)</option>
+  </select>
   <label>Claude API Key</label>
   <input type="password" id="cfg-claude-key" placeholder="sk-ant-...">
   <label>Azure Client ID</label>
-  <input type="text" id="cfg-client-id" value="aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0">
+  <input type="text" id="cfg-client-id">
   <label>Azure Tenant ID</label>
-  <input type="text" id="cfg-tenant-id" value="710620de-9a6b-4cca-bf53-99ce2a3e407f">
+  <input type="text" id="cfg-tenant-id">
   <div class="btn-row" style="margin-top:16px">
     <button class="btn btn-primary" onclick="saveConfig()">Speichern</button>
     <button class="btn btn-outline" onclick="toggleConfig()">Abbrechen</button>
@@ -403,6 +401,7 @@ var state = {
   folder: '',
   replyNeeded: false,
   replyText: '',
+  tasks: [],
   replyMode: 'replyAll',
   chatMessages: [],
   threadMails: null,
@@ -416,18 +415,78 @@ var outlookFolderMap = {};   // displayName -> folder ID
 var oneDriveFolderMap = {};  // path -> driveItem ID
 var msalInstance = null;
 var msalInteractionInProgress = false;
-var taskImportance = 'normal';
-var TODO_LISTS = {
-  'o.reinpold@hernie.de':  ['Aktive To-Dos', 'Regelmäßige To-Dos', 'Nachhalten', 'Website', 'Gedankenspeicher'],
-  'ole.reinpold@qodia.de': ["Aktive To-Do's", "Regelmäßige To-Do's", 'Nachhalten', 'Gedankenspeicher']
-};
 var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite', 'Tasks.ReadWrite', 'MailboxSettings.ReadWrite'];
 
+/* ========== MULTI-ACCOUNT SUPPORT ========== */
+// Aktives Konto – wird in Office.onReady per Office API auto-erkannt
+var accountKey = localStorage.getItem('ki_active_account') || 'o.reinpold@hernie.de';
+
+function lsKey(k) { return accountKey + '_' + k; }
+function lsGet(k) { return localStorage.getItem(lsKey(k)); }
+function lsSet(k, v) { localStorage.setItem(lsKey(k), v); }
+function lsRemove(k) { localStorage.removeItem(lsKey(k)); }
+
+function detectActiveAccount() {
+  // Automatisch das aktive Outlook-Konto erkennen (kein manueller Wechsel noetig)
+  try {
+    var email = Office.context.mailbox.userProfile.emailAddress;
+    if (email && email.toLowerCase() !== accountKey) {
+      var prevKey = accountKey;
+      accountKey = email.toLowerCase();
+      localStorage.setItem('ki_active_account', accountKey);
+      // Neues MSAL nur wenn anderes Azure-App
+      if ((DEFAULT_CLIENT_IDS[accountKey] || '') !== (DEFAULT_CLIENT_IDS[prevKey] || '')) {
+        msalInstance = null;
+      }
+      console.log('[Account] Auto-erkannt: ' + accountKey);
+    }
+  } catch(e) {
+    console.warn('[Account] Erkennung fehlgeschlagen:', e);
+  }
+}
+
+function switchAccount(email) {
+  // Manueller Wechsel ueber Einstellungen (Fallback)
+  var prevClientId = DEFAULT_CLIENT_IDS[accountKey] || '';
+  accountKey = email.toLowerCase();
+  localStorage.setItem('ki_active_account', accountKey);
+  if ((DEFAULT_CLIENT_IDS[accountKey] || '') !== prevClientId) {
+    msalInstance = null; // Neues Azure-App → neue MSAL-Instanz
+  }
+  state.graphToken = null;
+  updateConnectionUI(false);
+  loadConfig();
+  showToast('Konto gewechselt: ' + accountKey, 'info');
+  autoConnect(); // Direkt still verbinden
+}
+
 /* ========== MSAL AUTH ========== */
+function clearStaleMsalState() {
+  // NUR den interaction-Status loeschen (nicht die Token-Cache!).
+  // Verhindert, dass MSAL beim Start automatisch ein Popup oeffnet,
+  // ohne die gespeicherten Tokens zu loeschen (autoConnect bleibt erhalten).
+  for (var j = sessionStorage.length - 1; j >= 0; j--) {
+    var sk = sessionStorage.key(j);
+    if (sk && sk.indexOf('interaction') !== -1) {
+      sessionStorage.removeItem(sk);
+    }
+  }
+  // localStorage: nur interaction.status Keys, keine Token-Keys
+  var toRemove = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf('interaction') !== -1) {
+      toRemove.push(k);
+    }
+  }
+  toRemove.forEach(function(k) { localStorage.removeItem(k); });
+}
+
 function initMsal() {
   if (msalInstance) return msalInstance;
-  var clientId = localStorage.getItem('ki_client_id') || 'aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0';
-  var tenantId = localStorage.getItem('ki_tenant_id') || '710620de-9a6b-4cca-bf53-99ce2a3e407f';
+  clearStaleMsalState();
+  var clientId = lsGet('ki_client_id') || (DEFAULT_CLIENT_IDS && DEFAULT_CLIENT_IDS[accountKey]) || 'aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0';
+  var tenantId = lsGet('ki_tenant_id') || (DEFAULT_TENANT_IDS && DEFAULT_TENANT_IDS[accountKey]) || '710620de-9a6b-4cca-bf53-99ce2a3e407f';
   var msalConfig = {
     auth: {
       clientId: clientId,
@@ -440,33 +499,26 @@ function initMsal() {
     }
   };
   msalInstance = new msal.PublicClientApplication(msalConfig);
-  // Haengende Interaktionen aufraeumen (z.B. nach abgebrochenem Popup)
-  msalInstance.handleRedirectPromise().catch(function(e) {
-    console.log('MSAL redirect cleanup:', e);
-  });
   return msalInstance;
 }
 
 // Automatisch verbinden beim Start (wenn schon eingeloggt)
 async function autoConnect() {
+  // Nur stiller Versuch mit gecachtem Token – KEIN Popup, KEIN ssoSilent
   try {
     var instance = initMsal();
     var accounts = instance.getAllAccounts();
-    if (accounts.length > 0) {
-      var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
+    var matchingAccount = accounts.find(function(a) { return a.username && a.username.toLowerCase() === accountKey; }) || accounts[0];
+    if (matchingAccount) {
+      var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: matchingAccount });
       state.graphToken = silentResult.accessToken;
-      state.connectedEmail = (accounts[0].username || '').toLowerCase();
       updateConnectionUI(true);
-      // Ordner aktualisieren wenn aelter als 30 Min oder noch nie geladen
-      var lastLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
-      if (Date.now() - lastLoad > 1800000) {
-        loadOutlookFolders();
-        loadOneDriveFolders();
-      }
+      var lastLoad = parseInt(lsGet('ki_folders_loaded_at') || '0');
+      if (Date.now() - lastLoad > 1800000) { loadOutlookFolders(); loadOneDriveFolders(); }
       return true;
     }
   } catch(e) {
-    console.log('Auto-Connect: kein gespeicherter Account');
+    console.log('Auto-Connect: kein gecachter Token');
   }
   return false;
 }
@@ -478,31 +530,28 @@ async function connectMicrosoft() {
   }
   try {
     var instance = initMsal();
-    // Erst versuchen ob schon ein Account eingeloggt ist
+    // 1. Versuch: Silent mit cachedAccount
     var accounts = instance.getAllAccounts();
-    if (accounts.length > 0) {
+    var matchingAccount = accounts.find(function(a) { return a.username && a.username.toLowerCase() === accountKey; }) || accounts[0];
+    if (matchingAccount) {
       try {
-        var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
+        var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: matchingAccount });
         state.graphToken = silentResult.accessToken;
-        state.connectedEmail = (accounts[0].username || '').toLowerCase();
         updateConnectionUI(true);
         showToast('Mit Microsoft verbunden', 'success');
-        loadOutlookFolders();
-        loadOneDriveFolders();
+        loadOutlookFolders(); loadOneDriveFolders();
         return;
-      } catch(e) { /* Silent fehlgeschlagen, Popup noetig */ }
+      } catch(e) { /* weiter zu SSO */ }
     }
-    // Popup Login
+    // 2. Fallback: Popup mit loginHint (kein Account-Picker dank loginHint)
     msalInteractionInProgress = true;
-    var result = await instance.loginPopup({ scopes: graphScopes });
+    var result = await instance.loginPopup({ scopes: graphScopes, loginHint: accountKey });
     msalInteractionInProgress = false;
     if (result && result.accessToken) {
       state.graphToken = result.accessToken;
-      if (result.account) state.connectedEmail = (result.account.username || '').toLowerCase();
     } else if (result && result.account) {
       var tokenResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: result.account });
       state.graphToken = tokenResult.accessToken;
-      state.connectedEmail = (result.account.username || '').toLowerCase();
     }
     updateConnectionUI(true);
     showToast('Mit Microsoft verbunden', 'success');
@@ -522,39 +571,20 @@ async function connectMicrosoft() {
 }
 
 async function getGraphToken() {
+  // Gibt Token zurueck oder null – NIEMALS ein Popup oeffnen (nur connectMicrosoft() darf das)
   if (!msalInstance) initMsal();
   var accounts = msalInstance.getAllAccounts();
-  if (accounts.length === 0) {
-    showToast('Bitte erst mit Microsoft verbinden', 'info');
-    return null;
-  }
+  if (accounts.length === 0) return null;
+  var matchingAccount = accounts.find(function(a) { return a.username && a.username.toLowerCase() === accountKey; }) || accounts[0];
   try {
-    var result = await msalInstance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
+    var result = await msalInstance.acquireTokenSilent({ scopes: graphScopes, account: matchingAccount });
     state.graphToken = result.accessToken;
     return result.accessToken;
   } catch(e) {
-    // Token abgelaufen – Popup fuer Erneuerung
-    if (msalInteractionInProgress) {
-      showToast('Anmeldung laeuft bereits, bitte warten...', 'info');
-      return null;
-    }
-    try {
-      msalInteractionInProgress = true;
-      var result = await msalInstance.acquireTokenPopup({ scopes: graphScopes });
-      msalInteractionInProgress = false;
-      state.graphToken = result.accessToken;
-      return result.accessToken;
-    } catch(e2) {
-      msalInteractionInProgress = false;
-      if (e2.errorCode === 'interaction_in_progress') {
-        disconnectMicrosoft();
-        showToast('Login-Zustand zurueckgesetzt. Bitte nochmal "Verbinden" klicken.', 'info');
-      } else {
-        showToast('Token-Erneuerung fehlgeschlagen. Bitte abmelden und neu verbinden.', 'error');
-      }
-      updateConnectionUI(false);
-      return null;
-    }
+    // Silent fehlgeschlagen – kein automatisches Popup, Nutzer muss "Verbinden" klicken
+    state.graphToken = null;
+    updateConnectionUI(false);
+    return null;
   }
 }
 
@@ -626,8 +656,8 @@ function disconnectMicrosoft() {
 
 // Ordner manuell neu laden (Cache loeschen + frisch von API)
 async function refreshFolders() {
-  localStorage.removeItem('ki_outlook_folders');
-  localStorage.removeItem('ki_folders_loaded_at');
+  lsRemove('ki_outlook_folders');
+  lsRemove('ki_folders_loaded_at');
   showToast('Ordner werden neu geladen...', 'info');
   await loadOutlookFolders();
   showToast('Ordner aktualisiert (' + (document.getElementById('folder-select').options.length - 1) + ' Ordner)', 'success');
@@ -700,28 +730,28 @@ async function debugFolders() {
 /* ========== ORDNER-CACHE (localStorage) ========== */
 function saveFolderCaches(outlookFolders, oneDriveFolders) {
   try {
-    if (outlookFolders) localStorage.setItem('ki_outlook_folders', JSON.stringify(outlookFolders));
-    if (oneDriveFolders) localStorage.setItem('ki_onedrive_folders', JSON.stringify(oneDriveFolders));
-    localStorage.setItem('ki_folders_loaded_at', String(Date.now()));
+    if (outlookFolders) lsSet('ki_outlook_folders', JSON.stringify(outlookFolders));
+    if (oneDriveFolders) lsSet('ki_onedrive_folders', JSON.stringify(oneDriveFolders));
+    lsSet('ki_folders_loaded_at', String(Date.now()));
   } catch(e) {}
 }
 
 function loadCachedFolders() {
   try {
     // Gecachte Folder-IDs laden
-    var cachedIds = JSON.parse(localStorage.getItem('ki_folder_ids') || 'null');
+    var cachedIds = JSON.parse(lsGet('ki_folder_ids') || 'null');
     if (cachedIds) {
       Object.keys(cachedIds).forEach(function(k) {
         if (cachedIds[k]) outlookFolderMap[k] = cachedIds[k];
       });
     }
-    var of = JSON.parse(localStorage.getItem('ki_outlook_folders') || 'null');
+    var of = JSON.parse(lsGet('ki_outlook_folders') || 'null');
     if (of && of.map) {
       Object.keys(of.map).forEach(function(k) {
         if (of.map[k]) outlookFolderMap[k] = of.map[k];
       });
     }
-    var odf = JSON.parse(localStorage.getItem('ki_onedrive_folders') || 'null');
+    var odf = JSON.parse(lsGet('ki_onedrive_folders') || 'null');
     if (odf) {
       oneDriveFolderMap = odf;
       if (state.attachments.length > 0) renderAttachments();
@@ -895,7 +925,7 @@ function getKnownFolders() {
   });
   // 3. Aus localStorage (nur manuell hinzugefuegte Ordner via "+ Ordner")
   try {
-    var learned = JSON.parse(localStorage.getItem('ki_custom_folders') || '{}');
+    var learned = JSON.parse(lsGet('ki_custom_folders') || '{}');
     Object.keys(learned).forEach(function(name) {
       if (!folders[name]) folders[name] = learned[name];
     });
@@ -996,13 +1026,13 @@ function selectFolder(name, id) {
 // Jede Regel: { domain, email, keywords, mailFolder, attachFolder, note }
 function getAblageRegeln() {
   try {
-    return JSON.parse(localStorage.getItem('ki_ablage_regeln') || '[]');
+    return JSON.parse(lsGet('ki_ablage_regeln') || '[]');
   } catch(e) { return []; }
 }
 
 function saveAblageRegeln(regeln) {
   try {
-    localStorage.setItem('ki_ablage_regeln', JSON.stringify(regeln));
+    lsSet('ki_ablage_regeln', JSON.stringify(regeln));
   } catch(e) {}
   // Auch auf Festplatte speichern (persistent, Git-faehig)
   saveToGedaechtnis('regeln/gelernte_regeln.json', regeln);
@@ -1108,16 +1138,16 @@ function extractKeywords(text) {
 // Gefundene Folder-IDs in localStorage speichern
 function saveFolderIdCache() {
   try {
-    localStorage.setItem('ki_folder_ids', JSON.stringify(outlookFolderMap));
+    lsSet('ki_folder_ids', JSON.stringify(outlookFolderMap));
   } catch(e) {}
 }
 
 // Manuell hinzugefuegten Ordner speichern (nur via "+ Ordner" Button)
 function saveCustomFolder(name, id) {
   try {
-    var custom = JSON.parse(localStorage.getItem('ki_custom_folders') || '{}');
+    var custom = JSON.parse(lsGet('ki_custom_folders') || '{}');
     custom[name] = id || '';
-    localStorage.setItem('ki_custom_folders', JSON.stringify(custom));
+    lsSet('ki_custom_folders', JSON.stringify(custom));
     outlookFolderMap[name] = id || '';
   } catch(e) {}
 }
@@ -1238,7 +1268,7 @@ function saveAnalysisLog(aktionen) {
       antwort_noetig: state.replyNeeded,
       antwort_modus: state.replyMode,
       antwort_text: document.getElementById('reply-text').value.trim() ? '(vorhanden, ' + document.getElementById('reply-text').value.trim().length + ' Zeichen)' : '',
-      aufgabe: document.getElementById('task-title') ? document.getElementById('task-title').value.trim() : '',
+      aufgaben: state.tasks.map(function(t) { return { text: t.text, done: t.done }; }),
       anhaenge_ordner: odCurrentPath.map(function(p) { return p.name; }).join(' / ') || 'nicht gewaehlt'
     },
     aktionen_ausgefuehrt: aktionen,
@@ -1256,12 +1286,33 @@ function saveAnalysisLog(aktionen) {
   console.log('[Gedaechtnis] Bearbeitungs-Log gespeichert: ' + state.subject);
 }
 
+/* ========== SETTINGS MIGRATION ========== */
+function migrateOldSettings() {
+  // Einmalig: alte (unprefixte) Settings auf hernie.de-Prefix migrieren
+  if (localStorage.getItem('ki_settings_migrated_v2')) return;
+  var hPrefix = 'o.reinpold@hernie.de_';
+  var keys = ['ki_claude_key', 'ki_client_id', 'ki_tenant_id',
+              'ki_outlook_folders', 'ki_onedrive_folders', 'ki_folders_loaded_at',
+              'ki_folder_ids', 'ki_custom_folders', 'ki_ablage_regeln',
+              'ki_feedback_log', 'ki_analysis_cache'];
+  keys.forEach(function(k) {
+    var val = localStorage.getItem(k);
+    if (val !== null && localStorage.getItem(hPrefix + k) === null) {
+      localStorage.setItem(hPrefix + k, val);
+    }
+  });
+  localStorage.setItem('ki_settings_migrated_v2', '1');
+  console.log('[Migration] Alte Settings auf hernie.de-Prefix migriert');
+}
+
 /* ========== INIT ========== */
 Office.onReady(function(info) {
   if (info.host === Office.HostType.Outlook) {
+    migrateOldSettings();
+    detectActiveAccount(); // Auto-erkennen welches Postfach aktiv ist
     loadConfig();
     // Einmalig: alte falsche gelernte Ordner loeschen
-    localStorage.removeItem('ki_learned_folders');
+    lsRemove('ki_learned_folders');
     // Sofort: gecachte Ordner aus localStorage laden (0ms, kein API-Call)
     loadCachedFolders();
     // Sofort: Mail-Daten lesen (Office.js, lokal)
@@ -1283,19 +1334,166 @@ Office.onReady(function(info) {
 });
 
 /* ========== CONFIG ========== */
+var DEFAULT_CLIENT_IDS = {
+  'o.reinpold@hernie.de':  'aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0',
+  'ole.reinpold@qodia.de': 'e2f99ee3-0afc-450a-9416-e3508adc2422'
+};
+var DEFAULT_TENANT_IDS = {
+  'o.reinpold@hernie.de':  '710620de-9a6b-4cca-bf53-99ce2a3e407f',
+  'ole.reinpold@qodia.de': '90717f4c-db25-409e-b8ba-d69096033986'
+};
+
+var TODO_LISTS = {
+  'o.reinpold@hernie.de':  ['Aktive To-Dos', 'Regelmäßige To-Dos', 'Nachhalten', 'Website', 'Gedankenspeicher'],
+  'ole.reinpold@qodia.de': ["Aktive To-Do's", "Regelmäßige To-Do's", 'Nachhalten', 'Gedankenspeicher']
+};
+var taskImportance = 'normal';
+
+function populateTaskListsFallback(sel) {
+  var fallback = TODO_LISTS[accountKey] || TODO_LISTS['o.reinpold@hernie.de'];
+  sel.innerHTML = '';
+  fallback.forEach(function(name) {
+    var opt = document.createElement('option');
+    opt.value = name; // Name als value – createTaskFromEmail erkennt das
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+async function populateTaskLists() {
+  var sel = document.getElementById('task-list-select');
+  if (!sel) return;
+  if (!state.graphToken) {
+    populateTaskListsFallback(sel);
+    return;
+  }
+  sel.innerHTML = '<option value="">Laden...</option>';
+  try {
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
+    if (res && res.ok) {
+      var data = await res.json();
+      var lists = (data.value || []).filter(function(l) {
+        return l.displayName !== 'Flagged Email' && l.displayName !== 'Gekennzeichnete E-Mails';
+      });
+      if (lists.length > 0) {
+        sel.innerHTML = '';
+        lists.forEach(function(l) {
+          var opt = document.createElement('option');
+          opt.value = l.id;
+          opt.textContent = l.displayName;
+          sel.appendChild(opt);
+        });
+        return;
+      }
+    }
+  } catch(e) {
+    console.warn('To-Do Listen API fehlgeschlagen:', e);
+  }
+  // Fallback: hardcodierte Namen
+  populateTaskListsFallback(sel);
+}
+
+function setTaskImportance(level, btn) {
+  taskImportance = level;
+  var row = document.getElementById('task-importance-row');
+  row.querySelectorAll('button').forEach(function(b) {
+    b.style.border = '1px solid #ddd';
+    b.style.background = '#f5f5f5';
+    b.style.color = '';
+    b.style.fontWeight = '';
+  });
+  btn.style.border = '1px solid #0078d4';
+  btn.style.background = '#e3f2fd';
+  btn.style.color = '#0078d4';
+  btn.style.fontWeight = '600';
+}
+
+async function getTodoListId(name) {
+  try {
+    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
+    if (!res || !res.ok) return null;
+    var data = await res.json();
+    var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a]/g, '').replace(/\s+/g, ' ').trim(); };
+    var normName = normalize(name);
+    var found = (data.value || []).find(function(l) { return normalize(l.displayName) === normName; });
+    return found ? found.id : null;
+  } catch(e) { return null; }
+}
+
+async function createTaskFromEmail() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  var title = document.getElementById('task-title').value.trim();
+  if (!title) { showToast('Bitte Titel eingeben', 'info'); return; }
+  var sel = document.getElementById('task-list-select');
+  var listName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : sel.value;
+  var listIdFromSel = sel.value;
+  var dueDate = document.getElementById('task-due-date').value;
+  if (!listIdFromSel) { showToast('Bitte eine Liste auswählen', 'info'); return; }
+
+  // 1. E-Mail ZUERST flaggen (unabhaengig vom Listen-Lookup)
+  var flagged = false;
+  if (state.restMailId) {
+    var flagRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId, {
+      method: 'PATCH',
+      body: JSON.stringify({ flag: { flagStatus: 'flagged' } })
+    });
+    flagged = !!(flagRes && flagRes.ok);
+  }
+
+  // 2. Listen-ID live aus API holen und per fuzzy-Match auflösen
+  var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a\u00b4`]/g, '').replace(/\s+/g, ' ').trim(); };
+  var listsRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
+  var flagPrefix = flagged ? 'E-Mail markiert. ' : '';
+  if (!listsRes || !listsRes.ok) {
+    var st = listsRes ? listsRes.status : 0;
+    var reason = (st === 401 || st === 403) ? 'Keine Berechtigung (bitte neu verbinden)' : 'API-Fehler Status ' + st;
+    showToast(flagPrefix + 'Aufgabe fehlgeschlagen: ' + reason, 'error');
+    return;
+  }
+  var listsData = await listsRes.json();
+  var allLists = (listsData.value || []);
+  var found = allLists.find(function(l) { return l.id === listIdFromSel; })
+    || allLists.find(function(l) { return normalize(l.displayName) === normalize(listName); });
+  if (!found) {
+    var available = allLists.map(function(l) { return l.displayName; }).join(', ');
+    showToast(flagPrefix + 'Liste "' + listName + '" nicht gefunden. Verfügbar: ' + available, 'error');
+    return;
+  }
+
+  // 3. Aufgabe erstellen
+  var taskBody = {
+    title: title,
+    importance: taskImportance,
+    body: { content: 'Von: ' + state.from + ' <' + state.fromEmail + '>', contentType: 'text' }
+  };
+  if (dueDate) taskBody.dueDateTime = { dateTime: dueDate + 'T00:00:00.0000000', timeZone: 'UTC' };
+  var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists/' + found.id + '/tasks', {
+    method: 'POST',
+    body: JSON.stringify(taskBody)
+  });
+  if (res && res.ok) {
+    showToast((flagged ? 'E-Mail markiert & ' : '') + 'Aufgabe "' + title + '" in "' + found.displayName + '" erstellt', 'success');
+  } else {
+    var errSt = res ? res.status : 0;
+    showToast(flagPrefix + 'Aufgabe konnte nicht erstellt werden (Status ' + errSt + ')', 'error');
+  }
+}
+
 function loadConfig() {
-  var key = localStorage.getItem('ki_claude_key') || '';
-  var cid = localStorage.getItem('ki_client_id') || 'aa8510ea-c13b-4c87-bb7d-3bde7bf6b2f0';
-  var tid = localStorage.getItem('ki_tenant_id') || '710620de-9a6b-4cca-bf53-99ce2a3e407f';
+  var sel = document.getElementById('cfg-account-select');
+  if (sel) sel.value = accountKey;
+  var key = lsGet('ki_claude_key') || '';
+  var cid = lsGet('ki_client_id') || DEFAULT_CLIENT_IDS[accountKey] || '';
+  var tid = lsGet('ki_tenant_id') || DEFAULT_TENANT_IDS[accountKey] || '';
   document.getElementById('cfg-claude-key').value = key;
   document.getElementById('cfg-client-id').value = cid;
   document.getElementById('cfg-tenant-id').value = tid;
 }
 
 function saveConfig() {
-  localStorage.setItem('ki_claude_key', document.getElementById('cfg-claude-key').value.trim());
-  localStorage.setItem('ki_client_id', document.getElementById('cfg-client-id').value.trim());
-  localStorage.setItem('ki_tenant_id', document.getElementById('cfg-tenant-id').value.trim());
+  lsSet('ki_claude_key', document.getElementById('cfg-claude-key').value.trim());
+  lsSet('ki_client_id', document.getElementById('cfg-client-id').value.trim());
+  lsSet('ki_tenant_id', document.getElementById('cfg-tenant-id').value.trim());
   toggleConfig();
   showToast('Einstellungen gespeichert', 'success');
 }
@@ -1332,11 +1530,11 @@ async function loadGedaechtnis() {
 
     // Gelernte Regeln von Festplatte haben Vorrang vor localStorage
     if (gedaechtnis.gelernteRegeln.length > 0) {
-      localStorage.setItem('ki_ablage_regeln', JSON.stringify(gedaechtnis.gelernteRegeln));
+      lsSet('ki_ablage_regeln', JSON.stringify(gedaechtnis.gelernteRegeln));
       console.log('[Gedaechtnis] ' + gedaechtnis.gelernteRegeln.length + ' gelernte Regeln von Festplatte geladen');
     } else {
       // Fallback: localStorage in gedaechtnis uebernehmen
-      var lsRegeln = JSON.parse(localStorage.getItem('ki_ablage_regeln') || '[]');
+      var lsRegeln = JSON.parse(lsGet('ki_ablage_regeln') || '[]');
       if (lsRegeln.length > 0) {
         gedaechtnis.gelernteRegeln = lsRegeln;
         // Einmalig auf Festplatte sichern (Migration)
@@ -1347,11 +1545,11 @@ async function loadGedaechtnis() {
 
     // Feedback-Log von Festplatte laden
     if (gedaechtnis.feedbackLog.length > 0) {
-      localStorage.setItem('ki_feedback_log', JSON.stringify(gedaechtnis.feedbackLog));
+      lsSet('ki_feedback_log', JSON.stringify(gedaechtnis.feedbackLog));
       console.log('[Gedaechtnis] ' + gedaechtnis.feedbackLog.length + ' Feedback-Eintraege von Festplatte geladen');
     } else {
       // Fallback: localStorage in gedaechtnis uebernehmen
-      var lsFeedback = JSON.parse(localStorage.getItem('ki_feedback_log') || '[]');
+      var lsFeedback = JSON.parse(lsGet('ki_feedback_log') || '[]');
       if (lsFeedback.length > 0) {
         gedaechtnis.feedbackLog = lsFeedback;
         saveToGedaechtnis('feedback/feedback_log.json', lsFeedback);
@@ -1446,19 +1644,21 @@ function resetUIForNewMail() {
   state.folder = '';
   state.replyNeeded = false;
   state.replyText = '';
+  state.tasks = [];
   state.attachments = [];
-  // Task-Sektion zuruecksetzen
-  if (document.getElementById('task-title')) document.getElementById('task-title').value = '';
-  if (document.getElementById('task-due-date')) document.getElementById('task-due-date').value = '';
-  taskImportance = 'normal';
 
   // UI zuruecksetzen
   document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
-  document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
   state.blockSender = false;
   state.aktion = '';
-  document.getElementById('block-sender-toggle').checked = false;
-  document.getElementById('block-sender-area').style.display = 'none';
+  state.tasks = [];
+  // Spinner zuruecksetzen
+  document.getElementById('analyze-spinner').style.display = 'none';
+  // Aufgaben-Felder leeren
+  var tt = document.getElementById('task-title');
+  if (tt) tt.value = '';
+  var dd = document.getElementById('task-due-date');
+  if (dd) dd.value = '';
   document.getElementById('folder-input').value = '';
   state.folderId = null;
   document.getElementById('reply-toggle').checked = false;
@@ -1469,10 +1669,7 @@ function resetUIForNewMail() {
   document.querySelectorAll('#reply-mode-row .prio-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.rm === 'replyAll');
   });
-  // Task-Importance Buttons zuruecksetzen
-  document.querySelectorAll('#task-importance-row .prio-btn').forEach(function(b) {
-    b.classList.toggle('active', b.textContent.indexOf('Normal') >= 0);
-  });
+  // task-list entfernt
   document.getElementById('analysis-text').textContent = 'Noch nicht analysiert.';
   // Chat zuruecksetzen
   state.chatMessages = [];
@@ -1555,12 +1752,18 @@ function onMailLoaded() {
   // Ordner-Dropdown befuellen
   populateFolderDropdown();
 
-  // Task-Listen Dropdown befuellen (Fallback falls Token noch nicht da)
+  // Aufgaben-Bereich vorbereiten
+  document.getElementById('task-title').value = state.subject || '';
+  document.getElementById('task-due-date').value = '';
+  taskImportance = 'normal';
+  var impRow = document.getElementById('task-importance-row');
+  if (impRow) impRow.querySelectorAll('button').forEach(function(b, i) {
+    b.style.border = i === 1 ? '1px solid #0078d4' : '1px solid #ddd';
+    b.style.background = i === 1 ? '#e3f2fd' : '#f5f5f5';
+    b.style.color = i === 1 ? '#0078d4' : '';
+    b.style.fontWeight = i === 1 ? '600' : '';
+  });
   populateTaskLists();
-
-  // Task-Titel mit Betreff vorausfuellen
-  var taskTitleInput = document.getElementById('task-title');
-  if (taskTitleInput && state.subject) taskTitleInput.value = state.subject;
 
   // Anhaenge anzeigen
   if (state.attachments.length > 0) {
@@ -1572,7 +1775,7 @@ function onMailLoaded() {
   document.getElementById('analyze-mail-info').textContent = state.from + ': ' + state.subject;
 
   // KI-Analyse: NICHT automatisch starten – Kosten-Schutz
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) {
     document.getElementById('analysis-text').textContent = 'Kein Claude API Key. Bitte in Einstellungen eintragen.';
     document.getElementById('btn-analyze').disabled = true;
@@ -1644,7 +1847,6 @@ function renderAttachments() {
     nameInput.id = 'att-name-' + idx;
     nameInput.title = 'Dateiname (editierbar)';
     nameInput.style.cssText = 'width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:3px;font-size:12px;box-sizing:border-box;';
-    nameInput.onchange = (function(i) { return function(e) { state.attachments[i].suggestedName = e.target.value.trim(); }; })(idx);
     div.appendChild(nameInput);
 
     // Zeile 2: Ordner-Button
@@ -1719,7 +1921,7 @@ function closeOdBrowser() {
 function getAnalysisCache(mailId) {
   if (!mailId) return null;
   try {
-    var cache = JSON.parse(localStorage.getItem('ki_analysis_cache') || '{}');
+    var cache = JSON.parse(lsGet('ki_analysis_cache') || '{}');
     return cache[mailId] || null;
   } catch(e) { return null; }
 }
@@ -1727,20 +1929,20 @@ function getAnalysisCache(mailId) {
 function setAnalysisCache(mailId, result) {
   if (!mailId) return;
   try {
-    var cache = JSON.parse(localStorage.getItem('ki_analysis_cache') || '{}');
+    var cache = JSON.parse(lsGet('ki_analysis_cache') || '{}');
     // Max 200 Eintraege behalten (aelteste loeschen)
     var keys = Object.keys(cache);
     if (keys.length > 200) {
       delete cache[keys[0]];
     }
     cache[mailId] = result;
-    localStorage.setItem('ki_analysis_cache', JSON.stringify(cache));
+    lsSet('ki_analysis_cache', JSON.stringify(cache));
   } catch(e) { console.warn('Cache-Fehler:', e); }
 }
 
 /* ========== ANALYSE STARTEN (manuell) ========== */
 function startAnalysis(forceRefresh) {
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) {
     showToast('Kein Claude API Key – bitte in Einstellungen eintragen', 'error');
     return;
@@ -1748,9 +1950,9 @@ function startAnalysis(forceRefresh) {
 
   // Bei Force-Refresh: Cache fuer diese Mail loeschen
   if (forceRefresh) {
-    var cache = JSON.parse(localStorage.getItem('ki_analysis_cache') || '{}');
+    var cache = JSON.parse(lsGet('ki_analysis_cache') || '{}');
     delete cache[state.mailId];
-    localStorage.setItem('ki_analysis_cache', JSON.stringify(cache));
+    lsSet('ki_analysis_cache', JSON.stringify(cache));
   }
 
   // Nicht aus Cache? Dann API-Call
@@ -1770,8 +1972,12 @@ function startAnalysis(forceRefresh) {
 /* ========== KI ANALYSE ========== */
 async function analyzeEmail() {
   document.getElementById('analysis-text').innerHTML = '<div class="loading"><div class="spinner"></div><span>KI analysiert...</span></div>';
+  // Spinner im Analyze-Bar zeigen, Button verstecken
+  document.getElementById('btn-analyze-top').style.display = 'none';
+  document.getElementById('btn-reanalyze-top').style.display = 'none';
+  document.getElementById('analyze-spinner').style.display = 'flex';
 
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey) return;
 
   // Gedaechtnis als Kontext zusammenbauen
@@ -1822,7 +2028,7 @@ async function analyzeEmail() {
     + 'Text:\n' + (state.body || '').substring(0, 3000) + '\n\n'
     + formatEntriesForPrompt(getRelevantEntries(state.fromEmail, state.subject, state.attachments.length > 0))
     + '=== GESPERRTE DOMAINS ===\n'
-    + (function() { try { var b = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]'); return b.length > 0 ? b.join(', ') + '\nMails von diesen Domains: immer loeschen + absender_sperren: true\n\n' : 'Keine\n\n'; } catch(e) { return 'Keine\n\n'; } })()
+    + (function() { try { var b = JSON.parse(lsGet('ki_blocked_domains') || '[]'); return b.length > 0 ? b.join(', ') + '\nMails von diesen Domains: immer loeschen + absender_sperren: true\n\n' : 'Keine\n\n'; } catch(e) { return 'Keine\n\n'; } })()
     + '=== GELERNTE ABLAGE-REGELN (aus frueheren Entscheidungen) ===\n'
     + (function() {
       var regeln = getAblageRegeln();
@@ -1895,7 +2101,8 @@ async function analyzeEmail() {
     document.getElementById('btn-analyze').style.display = 'none';
     document.getElementById('btn-reanalyze').style.display = 'inline-block';
     document.getElementById('mail-age-warning').style.display = 'none';
-    // Top-Button umschalten
+    // Spinner ausblenden, "Neu" Button zeigen
+    document.getElementById('analyze-spinner').style.display = 'none';
     document.getElementById('btn-analyze-top').style.display = 'none';
     document.getElementById('btn-reanalyze-top').style.display = 'inline-block';
     document.getElementById('analyze-dot').className = 'status-dot cached';
@@ -1903,6 +2110,8 @@ async function analyzeEmail() {
   } catch(e) {
     console.error('Analyse-Fehler:', e);
     document.getElementById('analysis-text').textContent = 'Fehler: ' + e.message;
+    document.getElementById('analyze-spinner').style.display = 'none';
+    document.getElementById('btn-analyze-top').style.display = 'inline-block';
     showToast('KI-Analyse fehlgeschlagen: ' + e.message, 'error');
   }
 }
@@ -1944,12 +2153,7 @@ function applyAnalysis(a) {
     document.getElementById('folder-input').value = a.ordner;
   }
 
-  // Aktions-Button aktivieren
-  if (a.aktion) {
-    document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.a === a.aktion);
-    });
-  }
+  // state.aktion gesetzt (kein visueller Aktion-Button mehr)
 
   // Absender sperren (KI-Vorschlag)
   if (a.absender_sperren) {
@@ -1980,11 +2184,10 @@ function applyAnalysis(a) {
     document.getElementById('reply-text').value = a.antwort_entwurf;
   }
 
-  // Aufgaben: Ersten KI-Vorschlag als Task-Titel setzen, Sektion aufklappen
+  // Aufgaben: KI-Vorschlag als Titel vorausfuellen (erste Aufgabe)
   if (a.aufgaben && a.aufgaben.length > 0) {
     var taskTitleEl = document.getElementById('task-title');
-    if (taskTitleEl) taskTitleEl.value = a.aufgaben[0];
-    document.getElementById('sec-tasks').classList.remove('collapsed');
+    if (taskTitleEl && !taskTitleEl.value) taskTitleEl.value = a.aufgaben[0];
   }
 
   // Anhaenge
@@ -2031,7 +2234,6 @@ function setPrio(btn) {
 }
 
 function setAktion(btn) {
-  document.querySelectorAll('#aktion-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   state.aktion = btn.dataset.a;
   markAsChanged();
@@ -2136,9 +2338,9 @@ async function executeQuickBlock(mode) {
     }
 
     // 3. Lokal merken (fuer KI-Analyse)
-    var blocked = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]');
+    var blocked = JSON.parse(lsGet('ki_blocked_domains') || '[]');
     if (blocked.indexOf(blockValue) < 0) blocked.push(blockValue);
-    localStorage.setItem('ki_blocked_domains', JSON.stringify(blocked));
+    lsSet('ki_blocked_domains', JSON.stringify(blocked));
 
     showToast(blockLabel + ' gesperrt + Mail in Junk', 'success');
 
@@ -2156,116 +2358,7 @@ function onReplyToggle() {
   markAsChanged();
 }
 
-/* ========== ALS AUFGABE ANLEGEN ========== */
-
-function setTaskImportance(level, btn) {
-  taskImportance = level;
-  document.querySelectorAll('#task-importance-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-}
-
-function populateTaskListsFallback(sel) {
-  var email = state.connectedEmail || '';
-  var lists = TODO_LISTS[email] || TODO_LISTS['o.reinpold@hernie.de'] || [];
-  sel.innerHTML = '';
-  lists.forEach(function(name) {
-    var opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    sel.appendChild(opt);
-  });
-}
-
-async function populateTaskLists() {
-  var sel = document.getElementById('task-list-select');
-  if (!sel) return;
-  if (!state.graphToken) {
-    populateTaskListsFallback(sel);
-    return;
-  }
-  sel.innerHTML = '<option value="">Laden...</option>';
-  try {
-    var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
-    if (res && res.ok) {
-      var data = await res.json();
-      var lists = (data.value || []).filter(function(l) {
-        return l.displayName !== 'Flagged Email' && l.displayName !== 'Gekennzeichnete E-Mails';
-      });
-      if (lists.length > 0) {
-        sel.innerHTML = '';
-        lists.forEach(function(l) {
-          var opt = document.createElement('option');
-          opt.value = l.id;
-          opt.textContent = l.displayName;
-          sel.appendChild(opt);
-        });
-        return;
-      }
-    }
-  } catch(e) { console.warn('To-Do Listen API fehlgeschlagen:', e); }
-  populateTaskListsFallback(sel);
-}
-
-async function createTaskFromEmail() {
-  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
-  var title = document.getElementById('task-title').value.trim();
-  if (!title) { showToast('Bitte Titel eingeben', 'info'); return; }
-  var sel = document.getElementById('task-list-select');
-  var listName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : sel.value;
-  var listIdFromSel = sel.value;
-  var dueDate = document.getElementById('task-due-date').value;
-  if (!listIdFromSel) { showToast('Bitte eine Liste auswaehlen', 'info'); return; }
-
-  // 1. E-Mail ZUERST flaggen
-  var flagged = false;
-  if (state.restMailId) {
-    try {
-      var flagRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId, {
-        method: 'PATCH',
-        body: JSON.stringify({ flag: { flagStatus: 'flagged' } })
-      });
-      flagged = !!(flagRes && flagRes.ok);
-    } catch(e) { console.error('Flagging fehlgeschlagen:', e); }
-  }
-
-  // 2. Listen-ID live aus API holen und per fuzzy-Match aufloesen
-  var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a\u00b4`]/g, '').replace(/\s+/g, ' ').trim(); };
-  var listsRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
-  var flagPrefix = flagged ? 'E-Mail markiert. ' : '';
-  if (!listsRes || !listsRes.ok) {
-    var st = listsRes ? listsRes.status : 0;
-    var reason = (st === 401 || st === 403) ? 'Keine Berechtigung (bitte neu verbinden)' : 'API-Fehler Status ' + st;
-    showToast(flagPrefix + 'Aufgabe fehlgeschlagen: ' + reason, 'error');
-    return;
-  }
-  var listsData = await listsRes.json();
-  var allLists = (listsData.value || []);
-  var found = allLists.find(function(l) { return l.id === listIdFromSel; })
-    || allLists.find(function(l) { return normalize(l.displayName) === normalize(listName); });
-  if (!found) {
-    var available = allLists.map(function(l) { return l.displayName; }).join(', ');
-    showToast(flagPrefix + 'Liste "' + listName + '" nicht gefunden. Verfuegbar: ' + available, 'error');
-    return;
-  }
-
-  // 3. Aufgabe erstellen
-  var taskBody = {
-    title: title,
-    importance: taskImportance,
-    body: { content: 'Von: ' + state.from + ' <' + state.fromEmail + '>', contentType: 'text' }
-  };
-  if (dueDate) taskBody.dueDateTime = { dateTime: dueDate + 'T00:00:00.0000000', timeZone: 'UTC' };
-  var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists/' + found.id + '/tasks', {
-    method: 'POST',
-    body: JSON.stringify(taskBody)
-  });
-  if (res && res.ok) {
-    showToast((flagged ? 'E-Mail markiert & ' : '') + 'Aufgabe "' + title + '" in "' + found.displayName + '" erstellt', 'success');
-  } else {
-    var errSt = res ? res.status : 0;
-    showToast(flagPrefix + 'Aufgabe konnte nicht erstellt werden (Status ' + errSt + ')', 'error');
-  }
-}
+/* ========== MICROSOFT TO DO – ersetzt durch createTaskFromEmail() ========== */
 
 /* ========== FEEDBACK ========== */
 // Wird aufgerufen wenn Ole irgendeine Aenderung vornimmt (Aktion, Ordner, Antwort etc.)
@@ -2315,9 +2408,9 @@ function saveFeedbackToStorage(correct, text) {
     }
   };
   // localStorage (schneller Zugriff in der Session)
-  var feedbackLog = JSON.parse(localStorage.getItem('ki_feedback_log') || '[]');
+  var feedbackLog = JSON.parse(lsGet('ki_feedback_log') || '[]');
   feedbackLog.push(eintrag);
-  localStorage.setItem('ki_feedback_log', JSON.stringify(feedbackLog));
+  lsSet('ki_feedback_log', JSON.stringify(feedbackLog));
   // Auch auf Festplatte speichern (persistent, Git-faehig)
   // Gesamtes Log speichern (nicht nur den neuen Eintrag)
   gedaechtnis.feedbackLog.push(eintrag);
@@ -2528,7 +2621,7 @@ async function submitNewOneDriveFolder() {
 
 /* ========== ANTWORT GENERIEREN (Claude API) ========== */
 async function generateReply() {
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
 
   document.getElementById('reply-text').value = 'Antwort wird generiert...';
@@ -2578,7 +2671,7 @@ async function refineReply() {
   var currentReply = document.getElementById('reply-text').value.trim();
   if (!currentReply) { showToast('Erst eine Antwort generieren', 'info'); return; }
 
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
 
   document.getElementById('reply-text').value = 'Wird ueberarbeitet...';
@@ -2694,7 +2787,7 @@ async function refineOrGenerate() {
 
 // Antwort generieren basierend auf Anweisung
 async function generateReplyWithInstruction(instruction) {
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
 
   document.getElementById('reply-text').value = 'Antwort wird generiert...';
@@ -2927,10 +3020,10 @@ async function deleteMailAndOptionalBlock() {
     if (state.blockSender && state.fromEmail) {
       var domain = state.fromEmail.split('@')[1] || '';
       if (domain) {
-        var blocked = JSON.parse(localStorage.getItem('ki_blocked_domains') || '[]');
+        var blocked = JSON.parse(lsGet('ki_blocked_domains') || '[]');
         if (blocked.indexOf(domain) === -1) {
           blocked.push(domain);
-          localStorage.setItem('ki_blocked_domains', JSON.stringify(blocked));
+          lsSet('ki_blocked_domains', JSON.stringify(blocked));
         }
         showToast('Mail geloescht & Domain ' + domain + ' gesperrt', 'success');
       } else {
@@ -3083,12 +3176,7 @@ async function executeAll() {
     try { await uploadAllAttachments(); } catch(e) { errors.push('Upload: ' + e.message); }
   }
 
-  // 2. Mail flaggen + Aufgabe in To Do erstellen (wenn Titel eingetragen)
-  var taskTitle = document.getElementById('task-title').value.trim();
-  if (taskTitle) {
-    steps.push('Aufgabe erstellen');
-    try { await createTaskFromEmail(); } catch(e) { errors.push('Aufgabe: ' + e.message); }
-  }
+  // 2. Aufgaben: werden jetzt manuell per "Als Aufgabe anlegen" erstellt
 
   // 3. Antwort in Outlook oeffnen (VOR Mail-Verschiebung – braucht item-Referenz)
   var replyToggleOn = document.getElementById('reply-toggle').checked;
@@ -3431,7 +3519,7 @@ async function askKI() {
   var question = input.value.trim();
   if (!question) return;
 
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
 
   // Frage in Chat eintragen + UI aktualisieren
@@ -3689,7 +3777,7 @@ function renderChatMessages() {
 
 // Aus dem Chat-Verlauf eine Antwort generieren (mit vollem Gedaechtnis + Thread)
 async function generateReplyFromChat() {
-  var claudeKey = localStorage.getItem('ki_claude_key');
+  var claudeKey = lsGet('ki_claude_key');
   if (!claudeKey || claudeKey.length < 10) { showToast('Kein Claude API Key', 'error'); return; }
 
   // Chat-Zusammenfassung
@@ -3753,7 +3841,9 @@ function showToast(msg, type) {
   t.textContent = msg;
   t.className = 'toast ' + (type || 'info');
   t.style.display = 'block';
-  setTimeout(function() { t.style.display = 'none'; }, 3000);
+  var duration = (type === 'error') ? 8000 : 3000;
+  clearTimeout(t._toastTimer);
+  t._toastTimer = setTimeout(function() { t.style.display = 'none'; }, duration);
 }
 </script>
 </body>
