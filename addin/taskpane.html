@@ -1909,7 +1909,7 @@ async function analyzeEmail() {
     + '  "antwort_noetig": true/false,\n'
     + '  "antwort_modus": "replyAll|reply|forward (Standard: replyAll. reply nur wenn 1 Empfaenger. forward wenn Ole weiterleiten soll)",\n'
     + '  "antwort_entwurf": "Antwort-Text in Oles Stil (oder leer wenn nicht noetig)",\n'
-    + '  "aufgaben": ["Aufgabe 1", "Aufgabe 2"] (max 3, NUR was ueber Antworten+Ablegen hinausgeht),\n'
+    + '  "als_aufgabe": true/false (true wenn Handlungsbedarf besteht der UEBER Antworten+Ablegen hinausgeht. Typische Faelle: Rechnung per Ueberweisung bezahlen, Vertrag pruefen/unterschreiben, Termin koordinieren, Rueckruf erledigen. NICHT true bei: Lastschrift/SEPA-Einzug, reiner Info-Mail, Newsletter, automatische Benachrichtigungen),\n'
     + '  "anhaenge": [{"original": "Originalname.pdf", "vorschlag": "' + heute + '_Organisation_Beschreibung.pdf", "ordner": "EHC / Eingangsrechnungen"}]\n'
     + '}\n';
 
@@ -2019,6 +2019,17 @@ function applyAnalysis(a) {
     document.getElementById('reply-label').textContent = a.antwort_noetig ? 'Antwort noetig' : 'Keine Antwort noetig';
     document.getElementById('reply-area').style.display = a.antwort_noetig ? 'block' : 'none';
   }
+  // Als Aufgabe flaggen (KI-Vorschlag)
+  if (a.als_aufgabe !== undefined) {
+    var taskToggle = document.getElementById('task-toggle');
+    var taskLabel = document.getElementById('task-toggle-label');
+    taskToggle.checked = !!a.als_aufgabe;
+    if (taskLabel) {
+      taskLabel.style.color = a.als_aufgabe ? '#107c10' : '#666';
+      taskLabel.style.fontWeight = a.als_aufgabe ? '600' : 'normal';
+    }
+  }
+
   // Antwort-Modus (KI-Vorschlag)
   if (a.antwort_modus) {
     state.replyMode = a.antwort_modus;
