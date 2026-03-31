@@ -292,9 +292,9 @@
       </div>
       <div id="reply-area" style="display:none">
         <div style="font-size:11px;color:#666;margin-bottom:4px;">Antwort-Entwurf:</div>
-        <textarea id="reply-text" class="reply-expandable" placeholder="KI-Antwort erscheint hier..." onclick="expandField(this)" onblur="shrinkField(this)" oninput="markAsChanged()"></textarea>
+        <textarea id="reply-text" class="reply-expandable" placeholder="KI-Antwort erscheint hier..." onfocus="expandField(this)" onblur="shrinkField(this)" oninput="markAsChanged()"></textarea>
         <div style="font-size:11px;color:#666;margin-top:6px;margin-bottom:4px;">Anweisung an KI (optional):</div>
-        <textarea id="reply-instruction" class="reply-expandable" placeholder="z.B. 'formeller' oder 'frag nach dem Termin'" onclick="expandField(this)" onblur="shrinkField(this)"></textarea>
+        <textarea id="reply-instruction" class="reply-expandable" placeholder="z.B. 'formeller' oder 'frag nach dem Termin'" onfocus="expandField(this)" onblur="shrinkField(this)"></textarea>
         <div class="btn-row">
           <button class="btn btn-primary btn-sm" onclick="refineOrGenerate()">KI formulieren</button>
         </div>
