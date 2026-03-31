@@ -1694,6 +1694,7 @@ function renderAttachments() {
     nameInput.id = 'att-name-' + idx;
     nameInput.title = 'Dateiname (editierbar)';
     nameInput.style.cssText = 'width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:3px;font-size:12px;box-sizing:border-box;';
+    nameInput.onchange = (function(i) { return function(e) { state.attachments[i].suggestedName = e.target.value.trim(); }; })(idx);
     div.appendChild(nameInput);
 
     // Zeile 2: Ordner-Button
