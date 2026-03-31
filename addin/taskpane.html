@@ -79,12 +79,7 @@
     textarea.reply-expandable.field-expanded { min-height: 45vh; max-height: 60vh; }
 
     /* Tasks */
-    .task-item { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
-    .task-item input[type=checkbox] { margin-top: 2px; }
-    .task-text { flex: 1; font-size: 12px; line-height: 1.4; }
-    .task-text.done { text-decoration: line-through; color: #999; }
-    .add-task { display: flex; gap: 4px; margin-top: 6px; }
-    .add-task input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
+    #task-importance-row .prio-btn { padding: 4px 8px; }
 
     /* Buttons */
     .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; }
@@ -324,17 +319,27 @@
   </div>
 
   <!-- Tasks -->
-  <div class="section" id="sec-tasks">
-    <div class="section-head" onclick="toggleSection('sec-tasks')">Aufgaben <span class="arrow">▼</span></div>
+  <div class="section collapsed" id="sec-tasks">
+    <div class="section-head" onclick="toggleSection('sec-tasks')">Als Aufgabe anlegen <span class="arrow">&#9660;</span></div>
     <div class="section-body">
-      <div id="task-list"></div>
-      <div class="add-task">
-        <input type="text" id="new-task" placeholder="Eigene Aufgabe..." onkeydown="if(event.key==='Enter')addTask()">
-        <button class="btn btn-outline btn-sm" onclick="addTask()">+</button>
+      <label style="font-size:11px;color:#666;margin-bottom:2px;display:block;">Titel</label>
+      <input type="text" id="task-title" placeholder="Aufgabentitel..." style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;margin-bottom:6px;">
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <div style="flex:1">
+          <label style="font-size:11px;color:#666;margin-bottom:2px;display:block;">Liste</label>
+          <select id="task-list-select" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></select>
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;color:#666;margin-bottom:2px;display:block;">Faellig</label>
+          <input type="date" id="task-due-date" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;">
+        </div>
       </div>
-      <div class="btn-row" id="task-buttons" style="display:none">
-        <button class="btn btn-primary btn-sm" onclick="createTodosInMicrosoft()">In Microsoft To Do erstellen</button>
+      <div id="task-importance-row" style="display:flex;gap:4px;margin-bottom:8px;">
+        <button class="prio-btn" onclick="setTaskImportance('high',this)" style="flex:1;font-size:11px;">&#11014; Hoch</button>
+        <button class="prio-btn active" onclick="setTaskImportance('normal',this)" style="flex:1;font-size:11px;">Normal</button>
+        <button class="prio-btn" onclick="setTaskImportance('low',this)" style="flex:1;font-size:11px;">&#11015; Niedrig</button>
       </div>
+      <button class="btn btn-primary btn-sm" style="width:100%" onclick="createTaskFromEmail()">E-Mail flaggen &amp; Aufgabe erstellen</button>
     </div>
   </div>
 
@@ -398,7 +403,6 @@ var state = {
   folder: '',
   replyNeeded: false,
   replyText: '',
-  tasks: [],
   replyMode: 'replyAll',
   chatMessages: [],
   threadMails: null,
@@ -412,6 +416,11 @@ var outlookFolderMap = {};   // displayName -> folder ID
 var oneDriveFolderMap = {};  // path -> driveItem ID
 var msalInstance = null;
 var msalInteractionInProgress = false;
+var taskImportance = 'normal';
+var TODO_LISTS = {
+  'o.reinpold@hernie.de':  ['Aktive To-Dos', 'Regelmäßige To-Dos', 'Nachhalten', 'Website', 'Gedankenspeicher'],
+  'ole.reinpold@qodia.de': ["Aktive To-Do's", "Regelmäßige To-Do's", 'Nachhalten', 'Gedankenspeicher']
+};
 var graphScopes = ['User.Read', 'Mail.ReadWrite', 'Mail.Send', 'Files.ReadWrite', 'Tasks.ReadWrite', 'MailboxSettings.ReadWrite'];
 
 /* ========== MSAL AUTH ========== */
@@ -446,6 +455,7 @@ async function autoConnect() {
     if (accounts.length > 0) {
       var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
       state.graphToken = silentResult.accessToken;
+      state.connectedEmail = (accounts[0].username || '').toLowerCase();
       updateConnectionUI(true);
       // Ordner aktualisieren wenn aelter als 30 Min oder noch nie geladen
       var lastLoad = parseInt(localStorage.getItem('ki_folders_loaded_at') || '0');
@@ -474,6 +484,7 @@ async function connectMicrosoft() {
       try {
         var silentResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: accounts[0] });
         state.graphToken = silentResult.accessToken;
+        state.connectedEmail = (accounts[0].username || '').toLowerCase();
         updateConnectionUI(true);
         showToast('Mit Microsoft verbunden', 'success');
         loadOutlookFolders();
@@ -487,9 +498,11 @@ async function connectMicrosoft() {
     msalInteractionInProgress = false;
     if (result && result.accessToken) {
       state.graphToken = result.accessToken;
+      if (result.account) state.connectedEmail = (result.account.username || '').toLowerCase();
     } else if (result && result.account) {
       var tokenResult = await instance.acquireTokenSilent({ scopes: graphScopes, account: result.account });
       state.graphToken = tokenResult.accessToken;
+      state.connectedEmail = (result.account.username || '').toLowerCase();
     }
     updateConnectionUI(true);
     showToast('Mit Microsoft verbunden', 'success');
@@ -573,6 +586,7 @@ function updateConnectionUI(connected) {
     dot.className = 'conn-dot connected';
     btn.innerHTML = '<span class="conn-dot connected" id="conn-dot"></span>Verbunden';
     if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
+    populateTaskLists();
   } else {
     dot.className = 'conn-dot disconnected';
     btn.innerHTML = '<span class="conn-dot disconnected" id="conn-dot"></span>Verbinden';
@@ -1224,7 +1238,7 @@ function saveAnalysisLog(aktionen) {
       antwort_noetig: state.replyNeeded,
       antwort_modus: state.replyMode,
       antwort_text: document.getElementById('reply-text').value.trim() ? '(vorhanden, ' + document.getElementById('reply-text').value.trim().length + ' Zeichen)' : '',
-      aufgaben: state.tasks.map(function(t) { return { text: t.text, done: t.done }; }),
+      aufgabe: document.getElementById('task-title') ? document.getElementById('task-title').value.trim() : '',
       anhaenge_ordner: odCurrentPath.map(function(p) { return p.name; }).join(' / ') || 'nicht gewaehlt'
     },
     aktionen_ausgefuehrt: aktionen,
@@ -1432,8 +1446,11 @@ function resetUIForNewMail() {
   state.folder = '';
   state.replyNeeded = false;
   state.replyText = '';
-  state.tasks = [];
   state.attachments = [];
+  // Task-Sektion zuruecksetzen
+  if (document.getElementById('task-title')) document.getElementById('task-title').value = '';
+  if (document.getElementById('task-due-date')) document.getElementById('task-due-date').value = '';
+  taskImportance = 'normal';
 
   // UI zuruecksetzen
   document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -1452,7 +1469,10 @@ function resetUIForNewMail() {
   document.querySelectorAll('#reply-mode-row .prio-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.rm === 'replyAll');
   });
-  document.getElementById('task-list').innerHTML = '';
+  // Task-Importance Buttons zuruecksetzen
+  document.querySelectorAll('#task-importance-row .prio-btn').forEach(function(b) {
+    b.classList.toggle('active', b.textContent.indexOf('Normal') >= 0);
+  });
   document.getElementById('analysis-text').textContent = 'Noch nicht analysiert.';
   // Chat zuruecksetzen
   state.chatMessages = [];
@@ -1534,6 +1554,13 @@ function onMailLoaded() {
 
   // Ordner-Dropdown befuellen
   populateFolderDropdown();
+
+  // Task-Listen Dropdown befuellen (Fallback falls Token noch nicht da)
+  populateTaskLists();
+
+  // Task-Titel mit Betreff vorausfuellen
+  var taskTitleInput = document.getElementById('task-title');
+  if (taskTitleInput && state.subject) taskTitleInput.value = state.subject;
 
   // Anhaenge anzeigen
   if (state.attachments.length > 0) {
@@ -1617,6 +1644,7 @@ function renderAttachments() {
     nameInput.id = 'att-name-' + idx;
     nameInput.title = 'Dateiname (editierbar)';
     nameInput.style.cssText = 'width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:3px;font-size:12px;box-sizing:border-box;';
+    nameInput.onchange = (function(i) { return function(e) { state.attachments[i].suggestedName = e.target.value.trim(); }; })(idx);
     div.appendChild(nameInput);
 
     // Zeile 2: Ordner-Button
@@ -1952,10 +1980,11 @@ function applyAnalysis(a) {
     document.getElementById('reply-text').value = a.antwort_entwurf;
   }
 
-  // Aufgaben
+  // Aufgaben: Ersten KI-Vorschlag als Task-Titel setzen, Sektion aufklappen
   if (a.aufgaben && a.aufgaben.length > 0) {
-    state.tasks = a.aufgaben.map(function(t) { return { text: t, done: false }; });
-    renderTasks();
+    var taskTitleEl = document.getElementById('task-title');
+    if (taskTitleEl) taskTitleEl.value = a.aufgaben[0];
+    document.getElementById('sec-tasks').classList.remove('collapsed');
   }
 
   // Anhaenge
@@ -2127,134 +2156,115 @@ function onReplyToggle() {
   markAsChanged();
 }
 
-function renderTasks() {
-  var list = document.getElementById('task-list');
-  list.innerHTML = '';
-  state.tasks.forEach(function(t, i) {
-    var div = document.createElement('div');
-    div.className = 'task-item';
-    var cb = '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggleTask(' + i + ')">';
-    var textInput = '<input type="text" value="' + t.text.replace(/"/g, '&quot;') + '" class="task-edit" '
-      + 'onchange="editTask(' + i + ', this.value)" '
-      + 'style="flex:1;padding:2px 4px;border:1px solid #eee;border-radius:3px;font-size:12px;'
-      + (t.done ? 'text-decoration:line-through;color:#999;' : '') + '">';
-    var delBtn = '<button onclick="deleteTask(' + i + ')" style="background:none;border:none;color:#999;cursor:pointer;font-size:14px;padding:0 4px;" title="Loeschen">&times;</button>';
-    div.innerHTML = cb + textInput + delBtn;
-    list.appendChild(div);
+/* ========== ALS AUFGABE ANLEGEN ========== */
+
+function setTaskImportance(level, btn) {
+  taskImportance = level;
+  document.querySelectorAll('#task-importance-row .prio-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+function populateTaskListsFallback(sel) {
+  var email = state.connectedEmail || '';
+  var lists = TODO_LISTS[email] || TODO_LISTS['o.reinpold@hernie.de'] || [];
+  sel.innerHTML = '';
+  lists.forEach(function(name) {
+    var opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
   });
-  var btn = document.getElementById('task-buttons');
-  if (btn) btn.style.display = state.tasks.length > 0 ? 'flex' : 'none';
 }
 
-function editTask(i, newText) {
-  if (newText.trim()) {
-    state.tasks[i].text = newText.trim();
+async function populateTaskLists() {
+  var sel = document.getElementById('task-list-select');
+  if (!sel) return;
+  if (!state.graphToken) {
+    populateTaskListsFallback(sel);
+    return;
   }
-}
-
-function deleteTask(i) {
-  state.tasks.splice(i, 1);
-  renderTasks();
-}
-
-function toggleTask(i) {
-  state.tasks[i].done = !state.tasks[i].done;
-  renderTasks();
-}
-
-function addTask() {
-  var input = document.getElementById('new-task');
-  var text = input.value.trim();
-  if (!text) return;
-  state.tasks.push({ text: text, done: false });
-  input.value = '';
-  renderTasks();
-}
-
-/* ========== MICROSOFT TO DO ========== */
-async function createTodosInMicrosoft() {
-  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
-  var undoneTasks = state.tasks.filter(function(t) { return !t.done; });
-  if (undoneTasks.length === 0) { showToast('Keine offenen Aufgaben', 'info'); return; }
-
-  // Standard To-Do-Liste holen (oder "Aufgaben" erstellen)
-  var listId = await getOrCreateTodoList('Aufgaben');
-  if (!listId) { showToast('To-Do-Liste konnte nicht erstellt werden', 'error'); return; }
-
-  // Mail-Link erstellen (Outlook Web deep link)
-  var mailLink = '';
-  if (state.restMailId) {
-    mailLink = 'https://outlook.office.com/mail/id/' + encodeURIComponent(state.restMailId);
-  }
-
-  var erfolg = 0;
-  for (var i = 0; i < undoneTasks.length; i++) {
-    var t = undoneTasks[i];
-    // Notiz mit Kontext
-    var body = 'Aus Mail: ' + state.subject + '\n'
-      + 'Von: ' + state.from + ' <' + state.fromEmail + '>\n';
-    if (mailLink) body += 'Mail oeffnen: ' + mailLink + '\n';
-    // Anhang-Links hinzufuegen (wenn in OneDrive abgelegt)
-    if (state.attachments.length > 0) {
-      body += '\nAnhaenge:\n';
-      state.attachments.forEach(function(a) {
-        var name = a.suggestedName || a.name;
-        body += '- ' + name + '\n';
-      });
-    }
-
-    try {
-      var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists/' + listId + '/tasks', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: t.text,
-          body: { content: body, contentType: 'text' },
-          importance: 'normal',
-          isReminderOn: false
-        })
-      });
-      if (res && res.ok) {
-        erfolg++;
-        t.done = true;
-      }
-    } catch(e) { console.error('To-Do Fehler:', e); }
-  }
-
-  renderTasks();
-  if (erfolg > 0) {
-    showToast(erfolg + ' Aufgabe(n) in Microsoft To Do erstellt', 'success');
-  } else {
-    showToast('Aufgaben konnten nicht erstellt werden', 'error');
-  }
-}
-
-async function getOrCreateTodoList(name) {
+  sel.innerHTML = '<option value="">Laden...</option>';
   try {
-    // Bestehende Listen durchsuchen
     var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
     if (res && res.ok) {
       var data = await res.json();
-      var existing = (data.value || []).find(function(l) { return l.displayName === name; });
-      if (existing) return existing.id;
-      // Standard-Liste "Aufgaben" oder "Tasks" nehmen
-      var defaultList = (data.value || []).find(function(l) {
-        return l.displayName === 'Aufgaben' || l.displayName === 'Tasks' || l.displayName === 'Vorgänge';
+      var lists = (data.value || []).filter(function(l) {
+        return l.displayName !== 'Flagged Email' && l.displayName !== 'Gekennzeichnete E-Mails';
       });
-      if (defaultList) return defaultList.id;
-      // Erste Liste als Fallback
-      if (data.value && data.value.length > 0) return data.value[0].id;
+      if (lists.length > 0) {
+        sel.innerHTML = '';
+        lists.forEach(function(l) {
+          var opt = document.createElement('option');
+          opt.value = l.id;
+          opt.textContent = l.displayName;
+          sel.appendChild(opt);
+        });
+        return;
+      }
     }
-    // Neue Liste erstellen
-    var createRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists', {
-      method: 'POST',
-      body: JSON.stringify({ displayName: name })
-    });
-    if (createRes && createRes.ok) {
-      var created = await createRes.json();
-      return created.id;
-    }
-  } catch(e) { console.error('To-Do Liste Fehler:', e); }
-  return null;
+  } catch(e) { console.warn('To-Do Listen API fehlgeschlagen:', e); }
+  populateTaskListsFallback(sel);
+}
+
+async function createTaskFromEmail() {
+  if (!state.graphToken) { showToast('Bitte erst mit Microsoft verbinden', 'info'); return; }
+  var title = document.getElementById('task-title').value.trim();
+  if (!title) { showToast('Bitte Titel eingeben', 'info'); return; }
+  var sel = document.getElementById('task-list-select');
+  var listName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : sel.value;
+  var listIdFromSel = sel.value;
+  var dueDate = document.getElementById('task-due-date').value;
+  if (!listIdFromSel) { showToast('Bitte eine Liste auswaehlen', 'info'); return; }
+
+  // 1. E-Mail ZUERST flaggen
+  var flagged = false;
+  if (state.restMailId) {
+    try {
+      var flagRes = await graphFetch('https://graph.microsoft.com/v1.0/me/messages/' + state.restMailId, {
+        method: 'PATCH',
+        body: JSON.stringify({ flag: { flagStatus: 'flagged' } })
+      });
+      flagged = !!(flagRes && flagRes.ok);
+    } catch(e) { console.error('Flagging fehlgeschlagen:', e); }
+  }
+
+  // 2. Listen-ID live aus API holen und per fuzzy-Match aufloesen
+  var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a\u00b4`]/g, '').replace(/\s+/g, ' ').trim(); };
+  var listsRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
+  var flagPrefix = flagged ? 'E-Mail markiert. ' : '';
+  if (!listsRes || !listsRes.ok) {
+    var st = listsRes ? listsRes.status : 0;
+    var reason = (st === 401 || st === 403) ? 'Keine Berechtigung (bitte neu verbinden)' : 'API-Fehler Status ' + st;
+    showToast(flagPrefix + 'Aufgabe fehlgeschlagen: ' + reason, 'error');
+    return;
+  }
+  var listsData = await listsRes.json();
+  var allLists = (listsData.value || []);
+  var found = allLists.find(function(l) { return l.id === listIdFromSel; })
+    || allLists.find(function(l) { return normalize(l.displayName) === normalize(listName); });
+  if (!found) {
+    var available = allLists.map(function(l) { return l.displayName; }).join(', ');
+    showToast(flagPrefix + 'Liste "' + listName + '" nicht gefunden. Verfuegbar: ' + available, 'error');
+    return;
+  }
+
+  // 3. Aufgabe erstellen
+  var taskBody = {
+    title: title,
+    importance: taskImportance,
+    body: { content: 'Von: ' + state.from + ' <' + state.fromEmail + '>', contentType: 'text' }
+  };
+  if (dueDate) taskBody.dueDateTime = { dateTime: dueDate + 'T00:00:00.0000000', timeZone: 'UTC' };
+  var res = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists/' + found.id + '/tasks', {
+    method: 'POST',
+    body: JSON.stringify(taskBody)
+  });
+  if (res && res.ok) {
+    showToast((flagged ? 'E-Mail markiert & ' : '') + 'Aufgabe "' + title + '" in "' + found.displayName + '" erstellt', 'success');
+  } else {
+    var errSt = res ? res.status : 0;
+    showToast(flagPrefix + 'Aufgabe konnte nicht erstellt werden (Status ' + errSt + ')', 'error');
+  }
 }
 
 /* ========== FEEDBACK ========== */
@@ -3073,10 +3083,11 @@ async function executeAll() {
     try { await uploadAllAttachments(); } catch(e) { errors.push('Upload: ' + e.message); }
   }
 
-  // 2. Aufgaben in Microsoft To Do erstellen (nur unerledigte)
-  if (state.tasks.filter(function(t) { return !t.done; }).length > 0) {
-    steps.push('To Do erstellen');
-    try { await createTodosInMicrosoft(); } catch(e) { errors.push('To Do: ' + e.message); }
+  // 2. Mail flaggen + Aufgabe in To Do erstellen (wenn Titel eingetragen)
+  var taskTitle = document.getElementById('task-title').value.trim();
+  if (taskTitle) {
+    steps.push('Aufgabe erstellen');
+    try { await createTaskFromEmail(); } catch(e) { errors.push('Aufgabe: ' + e.message); }
   }
 
   // 3. Antwort in Outlook oeffnen (VOR Mail-Verschiebung – braucht item-Referenz)
