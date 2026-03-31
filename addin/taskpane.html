@@ -1348,6 +1348,7 @@ var TODO_LISTS = {
   'ole.reinpold@qodia.de': ["Aktive To-Do's", "Regelmäßige To-Do's", 'Nachhalten', 'Gedankenspeicher']
 };
 var taskImportance = 'normal';
+var cachedTodoLists = null; // Cache für To-Do-Listen nach erfolgreichem API-Aufruf
 
 function populateTaskListsFallback(sel) {
   var fallback = TODO_LISTS[accountKey] || TODO_LISTS['o.reinpold@hernie.de'];
@@ -1376,6 +1377,7 @@ async function populateTaskLists() {
         return l.displayName !== 'Flagged Email' && l.displayName !== 'Gekennzeichnete E-Mails';
       });
       if (lists.length > 0) {
+        cachedTodoLists = lists; // Cache fuer createTaskFromEmail
         sel.innerHTML = '';
         lists.forEach(function(l) {
           var opt = document.createElement('option');
@@ -1385,6 +1387,11 @@ async function populateTaskLists() {
         });
         return;
       }
+    } else {
+      var errSt = res ? res.status : 0;
+      var errTxt = '';
+      try { var d = await res.json(); errTxt = d.error ? d.error.message : ''; } catch(e2) {}
+      console.warn('To-Do Listen API Fehler', errSt, errTxt);
     }
   } catch(e) {
     console.warn('To-Do Listen API fehlgeschlagen:', e);
@@ -1440,23 +1447,32 @@ async function createTaskFromEmail() {
     flagged = !!(flagRes && flagRes.ok);
   }
 
-  // 2. Listen-ID live aus API holen und per fuzzy-Match auflösen
-  var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a\u00b4`]/g, '').replace(/\s+/g, ' ').trim(); };
-  var listsRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
   var flagPrefix = flagged ? 'E-Mail markiert. ' : '';
-  if (!listsRes || !listsRes.ok) {
-    var st = listsRes ? listsRes.status : 0;
-    var reason = (st === 401 || st === 403) ? 'Keine Berechtigung (bitte neu verbinden)' : 'API-Fehler Status ' + st;
-    showToast(flagPrefix + 'Aufgabe fehlgeschlagen: ' + reason, 'error');
-    return;
+
+  // 2. Listen-ID aus Cache oder per API holen
+  var normalize = function(s) { return s.toLowerCase().replace(/['\u2019\u2018\u201a\u00b4`]/g, '').replace(/\s+/g, ' ').trim(); };
+  var allLists = cachedTodoLists;
+  if (!allLists) {
+    // Kein Cache – einmal laden und cachen
+    var listsRes = await graphFetch('https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName');
+    if (!listsRes || !listsRes.ok) {
+      var st = listsRes ? listsRes.status : 0;
+      var apiErrTxt = '';
+      try { var d = await listsRes.json(); apiErrTxt = d.error ? ': ' + d.error.message : ''; } catch(e2) {}
+      showToast(flagPrefix + 'To-Do API Fehler ' + st + apiErrTxt, 'error');
+      return;
+    }
+    var listsData = await listsRes.json();
+    allLists = (listsData.value || []);
+    cachedTodoLists = allLists;
+    // Dropdown mit echten IDs nachfuellen
+    populateTaskLists();
   }
-  var listsData = await listsRes.json();
-  var allLists = (listsData.value || []);
   var found = allLists.find(function(l) { return l.id === listIdFromSel; })
     || allLists.find(function(l) { return normalize(l.displayName) === normalize(listName); });
   if (!found) {
     var available = allLists.map(function(l) { return l.displayName; }).join(', ');
-    showToast(flagPrefix + 'Liste "' + listName + '" nicht gefunden. Verfügbar: ' + available, 'error');
+    showToast(flagPrefix + 'Liste "' + listName + '" nicht gefunden. Verfuegbar: ' + available, 'error');
     return;
   }
 
